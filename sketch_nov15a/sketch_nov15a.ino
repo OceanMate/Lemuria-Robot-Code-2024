@@ -243,7 +243,7 @@ void setup()
 
   // Set up LCD
 
-  lcd.begin();
+  lcd.begin(LCD_I2C_Addr, 20, 4);
 
   lcd.backlight();
 
