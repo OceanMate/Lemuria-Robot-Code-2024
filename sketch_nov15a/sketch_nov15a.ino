@@ -100,8 +100,8 @@ int ST2_S2 = 9;  // Arduino pin attached to Sabertooth controller
 
 double mFLangle = M_PI / 4;
 double mFRangle = -M_PI / 4;
-double mBRangle = -M_PI * (3 / 4);
-double mBLangle = M_PI * (3 / 4);
+double mBRangle = -M_PI * (3.0 / 4);
+double mBLangle = M_PI * (3.0 / 4);
 
 // Sends motor testing information to LCD screen
 
@@ -219,7 +219,7 @@ void setMotor(int motorNum, int power) {
 }
 
 void balanceSpeeds(int limit, int& value1, int& value2, int& value3, int& value4) {
-  int maxValue = 0;
+  double maxValue = 0;
   if (maxValue < abs(value1) && abs(value1) > limit) maxValue = abs(value1);
   if (maxValue < abs(value2) && abs(value2) > limit) maxValue = abs(value2);
   if (maxValue < abs(value3) && abs(value3) > limit) maxValue = abs(value3);
@@ -227,10 +227,10 @@ void balanceSpeeds(int limit, int& value1, int& value2, int& value3, int& value4
 
   if (maxValue == 0) return;
 
-  value1 /= maxValue;
-  value2 /= maxValue;
-  value3 /= maxValue;
-  value4 /= maxValue;
+  value1 = (value1/maxValue) * limit;
+  value2 = (value2/maxValue) * limit;
+  value3 = (value3/maxValue) * limit;
+  value4 = (value4/maxValue) * limit;
 }
 
 
@@ -254,11 +254,12 @@ void setup()
 
   BTSerial.begin(SerialBaudRate);  // Start the Bluetooth channel
 
+  Serial.begin(SerialBaudRate);
 
 
   // Set up LCD
 
-  lcd.begin(LCD_I2C_Addr, 20, 4);
+  lcd.begin();
 
   lcd.backlight();
 
@@ -308,34 +309,35 @@ void loop()
   int mFL, mFR, mBR, mBL, mV;
 
 
-  Joy1_Y = analogRead(A0);  // get the left vertical (Y) joystick input
+  Joy1_Y = analogRead(A2);  // get the left vertical (Y) joystick input
 
-  Joy1_X = analogRead(A1);  // get the left horizontal (X) joystick input
+  Joy1_X = analogRead(A3);  // get the left horizontal (X) joystick input
 
-  Joy2_Y = analogRead(A2);  // get the right vertical (Y) joystick input
+  //Joy2_Y = analogRead(A2);  // get the right vertical (Y) joystick input
 
-  Joy2_X = analogRead(A3);  // get the right horizontal (X) joystick input
-
+  //Joy2_X = analogRead(A3);  // get the right horizontal (X) joystick input
 
   // maps the joysitck outputs to something the motor can use.
   // the motors take a value from -127 - 127
   // Map to 511 to improve accuracy when doing math
-  yPwr = map(Joy1_Y, 0, 1023, -511, 511);
-  xPwr = map(Joy1_X, 0, 1023, -511, 511);
-  spinPwr = map(Joy2_X, 0, 1023, -511, 511);
-  vertPwr = map(Joy2_Y, 0, 1023, -127, 127);  //Currently note simulated. Need to add 2 more motors
+  yPwr = map(Joy1_Y, 0, 865, -511, 511);
+  xPwr = map(Joy1_X, 0, 865, -511, 511);
+  spinPwr = 0;
+  //spinPwr = map(Joy2_X, 0, 1023, -511, 511);
+  //vertPwr = map(Joy2_Y, 0, 1023, -127, 127);  //Currently note simulated. Need to add 2 more motors
 
   // converts the joystick 1 to polar coordinates
-  int mag, angle;
-  mag = (int)sqrt(yPwr * yPwr + xPwr * xPwr);
+  int mag;
+  double angle;
+  mag = (int)sqrt(((long)yPwr * yPwr) + ((long)xPwr * xPwr));
   angle = atan2(yPwr, xPwr);
 
   // only does the larger spin or x,y movement
-  if (mag >= spinPwr) {
-    mFL = (int)(mag * cos(angle * mFLangle));
-    mFR = (int)(mag * cos(angle * mFRangle));
-    mBR = (int)(mag * cos(angle * mBRangle));
-    mBL = (int)(mag * cos(angle * mBLangle));
+  if (mag >= abs(spinPwr)) {
+    mFL = (int)(mag * cos(angle + mFLangle));
+    mFR = (int)(mag * cos(angle + mFRangle));
+    mBR = (int)(mag * cos(angle + mBRangle));
+    mBL = (int)(mag * cos(angle + mBLangle));
   } else {
     mFL = (int)(spinPwr * tan(mFLangle));
     mFR = (int)(spinPwr * tan(mFRangle));
