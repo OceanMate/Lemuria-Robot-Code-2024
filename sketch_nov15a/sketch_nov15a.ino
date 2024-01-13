@@ -218,6 +218,21 @@ void setMotor(int motorNum, int power) {
   digitalWrite(controllerNum, LOW);
 }
 
+void balanceSpeeds(int limit, int& value1, int& value2, int& value3, int& value4) {
+  int maxValue = 0;
+  if (maxValue < abs(value1) && abs(value1) > limit) maxValue = abs(value1);
+  if (maxValue < abs(value2) && abs(value2) > limit) maxValue = abs(value2);
+  if (maxValue < abs(value3) && abs(value3) > limit) maxValue = abs(value3);
+  if (maxValue < abs(value4) && abs(value4) > limit) maxValue = abs(value4);
+
+  if (maxValue == 0) return;
+
+  value1 /= maxValue;
+  value2 /= maxValue;
+  value3 /= maxValue;
+  value4 /= maxValue;
+}
+
 
 void setup()
 
@@ -328,17 +343,16 @@ void loop()
     mBL = (int)(spinPwr * tan(mBLangle));
   }
 
+  // Limits the speeds so they can't exceed the max speed of the motors
+  balanceSpeeds(511, mFL, mFR, mBL, mBR);
+
   // scale back down to +-127
   mFL /= 4;
   mFR /= 4;
   mBL /= 4;
   mBR /= 4;
 
-  //
-
   // Set the power in each motor
-
-  //
 
   setMotor(1, mFL);
 
@@ -348,7 +362,7 @@ void loop()
 
   delay(1);
 
-  setMotor(3, mBL); 
+  setMotor(3, mBL);
 
   delay(1);
 
