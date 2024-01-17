@@ -98,10 +98,13 @@ int ST1_S2 = 8;  // Arduino pin attached to Sabertooth controller
 int ST2_S2 = 9;  // Arduino pin attached to Sabertooth controller
 
 
-double mFLangle = M_PI / 4;
-double mFRangle = -M_PI / 4;
-double mBRangle = -M_PI * (3.0 / 4);
-double mBLangle = M_PI * (3.0 / 4);
+double mFLangle = -M_PI / 4;
+double mFRangle = M_PI / 4;
+double mBRangle = M_PI * (3.0 / 4);
+double mBLangle = -M_PI * (3.0 / 4);
+
+float robotLength = 62.4, robotWidth = 43.6, motorLocAngle[4];
+int motorRotCont[4];
 
 // Sends motor testing information to LCD screen
 
@@ -237,6 +240,27 @@ void balanceSpeeds(int limit, int& value1, int& value2, int& value3, int& value4
 void setup()
 
 {
+  motorLocAngle[0] = atan2(robotWidth/2, robotLength/2);
+  motorLocAngle[1] = atan2(-robotWidth/2, robotLength/2);
+  motorLocAngle[2] = atan2(-robotWidth/2, -robotLength/2);
+  motorLocAngle[3] = atan2(robotWidth/2, -robotLength/2);
+
+  if (sin(motorLocAngle[0] - mFLangle) != 0)
+    motorRotCont[0] = (int)(sin(motorLocAngle[0] - mFLangle) / abs(sin(motorLocAngle[0] - mFLangle)));
+  else motorRotCont[0] = 0;
+
+  if (sin(motorLocAngle[1] - mFRangle) != 0)
+    motorRotCont[1] = (int)(sin(motorLocAngle[0] - mFRangle) / abs(sin(motorLocAngle[1] - mFRangle)));
+  else motorRotCont[1] = 0;
+
+  if (sin(motorLocAngle[2] - mBLangle) != 0)
+    motorRotCont[2] = (int)(sin(motorLocAngle[2] - mBLangle) / abs(sin(motorLocAngle[2] - mBLangle)));
+  else motorRotCont[2] = 0;  
+
+    if (sin(motorLocAngle[3] - mBRangle) != 0)
+    motorRotCont[3] = (int)(sin(motorLocAngle[3] - mBRangle) / abs(sin(motorLocAngle[3] - mBRangle)));
+  else motorRotCont[3] = 0;
+
 
   // Set Arduino pin for each sabertooth as OUTPUT
 
@@ -324,7 +348,7 @@ void loop()
   xPwr = map(Joy1_X, 0, 865, -511, 511);
   spinPwr = 0;
   //spinPwr = map(Joy2_X, 0, 1023, -511, 511);
-  //vertPwr = map(Joy2_Y, 0, 1023, -127, 127);  //Currently note simulated. Need to add 2 more motors
+  //vertPwr = map(Joy2_Y, 0, 1023, -127, 127);  //Currently not simulated. Need to add 2 more motors
 
   // converts the joystick 1 to polar coordinates
   int mag;
@@ -339,10 +363,10 @@ void loop()
     mBR = (int)(mag * cos(angle + mBRangle));
     mBL = (int)(mag * cos(angle + mBLangle));
   } else {
-    mFL = (int)(spinPwr * tan(mFLangle));
-    mFR = (int)(spinPwr * tan(mFRangle));
-    mBR = (int)(spinPwr * tan(mBRangle));
-    mBL = (int)(spinPwr * tan(mBLangle));
+    mFL = spinPwr * motorRotCont[0];
+    mFR = spinPwr * motorRotCont[1];
+    mBR = spinPwr * motorRotCont[2];
+    mBL = spinPwr * motorRotCont[3];
   }
 
   // Limits the speeds so they can't exceed the max speed of the motors
