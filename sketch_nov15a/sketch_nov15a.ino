@@ -97,7 +97,6 @@ int ST1_S2 = 8;  // Arduino pin attached to Sabertooth controller
 
 int ST2_S2 = 9;  // Arduino pin attached to Sabertooth controller
 
-
 double mFLangle = -M_PI / 4;
 double mFRangle = M_PI / 4;
 double mBRangle = M_PI * (3.0 / 4);
@@ -236,6 +235,13 @@ void balanceSpeeds(int limit, int& value1, int& value2, int& value3, int& value4
   value4 = (value4/maxValue) * limit;
 }
 
+void findMotorRotCont(int indexValue, double motorAngle) {
+
+
+  if (sin(motorLocAngle[indexValue] - motorAngle) != 0)
+    motorRotCont[indexValue] = (int)(sin(motorLocAngle[indexValue] - motorAngle) / abs(sin(motorLocAngle[indexValue] - motorAngle)));
+  else motorRotCont[indexValue] = 0;
+}
 
 void setup()
 
@@ -245,23 +251,12 @@ void setup()
   motorLocAngle[2] = atan2(-robotWidth/2, -robotLength/2);
   motorLocAngle[3] = atan2(robotWidth/2, -robotLength/2);
 
-  if (sin(motorLocAngle[0] - mFLangle) != 0)
-    motorRotCont[0] = (int)(sin(motorLocAngle[0] - mFLangle) / abs(sin(motorLocAngle[0] - mFLangle)));
-  else motorRotCont[0] = 0;
+  findMotorRotCont(0, mFLangle);
+  findMotorRotCont(1, mFRangle);
+  findMotorRotCont(2, mBRangle);
+  findMotorRotCont(3, mBLangle);
 
-  if (sin(motorLocAngle[1] - mFRangle) != 0)
-    motorRotCont[1] = (int)(sin(motorLocAngle[0] - mFRangle) / abs(sin(motorLocAngle[1] - mFRangle)));
-  else motorRotCont[1] = 0;
-
-  if (sin(motorLocAngle[2] - mBLangle) != 0)
-    motorRotCont[2] = (int)(sin(motorLocAngle[2] - mBLangle) / abs(sin(motorLocAngle[2] - mBLangle)));
-  else motorRotCont[2] = 0;  
-
-    if (sin(motorLocAngle[3] - mBRangle) != 0)
-    motorRotCont[3] = (int)(sin(motorLocAngle[3] - mBRangle) / abs(sin(motorLocAngle[3] - mBRangle)));
-  else motorRotCont[3] = 0;
-
-
+ 
   // Set Arduino pin for each sabertooth as OUTPUT
 
   pinMode(ST1_S2, OUTPUT);  // Arduino pin control to sabertooth
@@ -344,17 +339,17 @@ void loop()
   // maps the joysitck outputs to something the motor can use.
   // the motors take a value from -127 - 127
   // Map to 511 to improve accuracy when doing math
-  yPwr = map(Joy1_Y, 0, 865, -511, 511);
-  xPwr = map(Joy1_X, 0, 865, -511, 511);
+  //yPwr = map(Joy1_Y, 0, 865, -511, 511);
+  //xPwr = map(Joy1_X, 0, 865, -511, 511);
   spinPwr = 0;
-  //spinPwr = map(Joy2_X, 0, 1023, -511, 511);
+  spinPwr = map(Joy1_X, 0, 865, -511, 511);
   //vertPwr = map(Joy2_Y, 0, 1023, -127, 127);  //Currently not simulated. Need to add 2 more motors
 
   // converts the joystick 1 to polar coordinates
   int mag;
   double angle;
   mag = (int)sqrt(((long)yPwr * yPwr) + ((long)xPwr * xPwr));
-  angle = atan2(yPwr, xPwr);
+  angle = atan2(xPwr, yPwr);
 
   // only does the larger spin or x,y movement
   if (mag >= abs(spinPwr)) {
