@@ -97,10 +97,10 @@ int ST1_S2 = 8;  // Arduino pin attached to Sabertooth controller
 
 int ST2_S2 = 9;  // Arduino pin attached to Sabertooth controller
 
-double mFLangle = -M_PI / 4;
-double mFRangle = M_PI / 4;
-double mBRangle = M_PI * (3.0 / 4);
-double mBLangle = -M_PI * (3.0 / 4);
+float mFLangle = -M_PI / 4,
+ mFRangle = M_PI / 4,
+ mBRangle = M_PI * (3.0 / 4),
+ mBLangle = -M_PI * (3.0 / 4);
 
 float robotLength = 62.4, robotWidth = 43.6, motorLocAngle[4];
 int motorRotCont[4];
@@ -348,8 +348,14 @@ void loop()
   // converts the joystick 1 to polar coordinates
   int mag;
   double angle;
-  mag = (int)sqrt(((long)yPwr * yPwr) + ((long)xPwr * xPwr));
   angle = atan2(xPwr, yPwr);
+  
+  // Convert the joystick from a square to a circle
+  xPwr = (int) (xPwr * cos(angle));
+  yPwr = (int) (yPwr * sin(angle));
+
+  mag = (int) sqrt(((long)yPwr * yPwr) + ((long)xPwr * xPwr));
+
 
   // only does the larger spin or x,y movement
   if (mag >= abs(spinPwr)) {
