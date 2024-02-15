@@ -97,6 +97,9 @@ int ST1_S2 = 8;  // Arduino pin attached to Sabertooth controller
 
 int ST2_S2 = 9;  // Arduino pin attached to Sabertooth controller
 
+int VM_1 = -1;
+int VM_2 = -1;
+
 float mFLangle = -M_PI / 4,
  mFRangle = M_PI / 4,
  mBRangle = M_PI * (3.0 / 4),
@@ -106,7 +109,6 @@ float robotLength = 62.4, robotWidth = 43.6, motorLocAngle[4];
 int motorRotCont[4];
 
 // Sends motor testing information to LCD screen
-
 void motorMessage(int motorNum, int power) {
 
   int lineNum = -1;
@@ -157,10 +159,7 @@ void motorMessage(int motorNum, int power) {
   lcd.print(" ");
 }
 
-
-
 // Initialize motor test parameters
-
 void setMotor(int motorNum, int power) {
 
 
@@ -220,6 +219,7 @@ void setMotor(int motorNum, int power) {
   digitalWrite(controllerNum, LOW);
 }
 
+// Limits all the motor speed to be between -1 to 1
 void balanceSpeeds(int limit, int& value1, int& value2, int& value3, int& value4) {
   double maxValue = 0;
   if (maxValue < abs(value1) && abs(value1) > limit) maxValue = abs(value1);
@@ -235,17 +235,33 @@ void balanceSpeeds(int limit, int& value1, int& value2, int& value3, int& value4
   value4 = (value4/maxValue) * limit;
 }
 
+// Finds the number to mulitple the turning for each motor 
 void findMotorRotCont(int indexValue, double motorAngle) {
-
 
   if (sin(motorLocAngle[indexValue] - motorAngle) != 0)
     motorRotCont[indexValue] = (int)(sin(motorLocAngle[indexValue] - motorAngle) / abs(sin(motorLocAngle[indexValue] - motorAngle)));
   else motorRotCont[indexValue] = 0;
 }
 
-void setup()
+// Sets the speed for one of the vertical motors. 
+// MotorNum should be 1 or 2 Power should be from -127 to 127
+void setVerticalMotor(int motorNum, int power) {
+  int pin;
+  switch (motorNum) {
+    case 1: 
+      pin = VM_1;
+      break;
+    case 2:
+      pin = VM_2;
+      break;
+    default:
+      return;
+  }
 
-{
+  analogWrite(pin, power + 127);
+}
+
+void setup() {
   motorLocAngle[0] = atan2(robotWidth/2, robotLength/2);
   motorLocAngle[1] = atan2(-robotWidth/2, robotLength/2);
   motorLocAngle[2] = atan2(-robotWidth/2, -robotLength/2);
@@ -314,10 +330,7 @@ void setup()
   lcd.print("M3:     M4: ");  // 'Ms' - Motor Speed for motor 3 and 4
 }
 
-
-void loop()
-
-{
+void loop() {
 
 
 
