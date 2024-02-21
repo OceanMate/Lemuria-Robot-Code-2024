@@ -328,19 +328,19 @@ void loop()
   int mFL, mFR, mBR, mBL, mV;
 
 
-  Joy1_Y = analogRead(A2);  // get the left vertical (Y) joystick input
+  Joy1_Y = analogRead(A0);  // get the left vertical (Y) joystick input
 
-  Joy1_X = analogRead(A3);  // get the left horizontal (X) joystick input
+  Joy1_X = analogRead(A1);  // get the left horizontal (X) joystick input
 
-  //Joy2_Y = analogRead(A2);  // get the right vertical (Y) joystick input
+  Joy2_Y = analogRead(A2);  // get the right vertical (Y) joystick input
 
-  //Joy2_X = analogRead(A3);  // get the right horizontal (X) joystick input
+  Joy2_X = analogRead(A3);  // get the right horizontal (X) joystick input
 
   // maps the joysitck outputs to something the motor can use.
   // the motors take a value from -127 - 127
   // Map to 511 to improve accuracy when doing math
-  //yPwr = map(Joy1_Y, 0, 865, -511, 511);
-  //xPwr = map(Joy1_X, 0, 865, -511, 511);
+  yPwr = map(Joy1_Y, 0, 865, -511, 511);
+  xPwr = map(Joy1_X, 0, 865, -511, 511);
   spinPwr = 0;
   spinPwr = map(Joy1_X, 0, 865, -511, 511);
   //vertPwr = map(Joy2_Y, 0, 1023, -127, 127);  //Currently not simulated. Need to add 2 more motors
