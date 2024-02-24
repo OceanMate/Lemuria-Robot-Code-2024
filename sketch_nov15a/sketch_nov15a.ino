@@ -55,50 +55,28 @@
 
 #include <SoftwareSerial.h>  // used for Sabretooth & BlueTooth
 
+#include <Servo.h>
 
-// Sabertooth device driver
-
-#include <SabertoothSimplified.h>
-
-
-// include the DISPLAY library
+#include <AFMotor.h>
 
 #include <Wire.h>
 
-#include <LiquidCrystal_I2C.h>
 #include <Math.h>
 
 
 int SerialBaudRate = 9600;
 
+//set Hozantal motors
+/*AF_DCMotor HM_1(1);
+AF_DCMotor HM_2(2);
+AF_DCMotor HM_3(3);
+AF_DCMotor HM_4(4);*/
 
-// Initialize the LCD screen
-
-int LCD_I2C_Addr = 0x27;  //I2C address for the LCD Screen (Default=0x27)
-
-LiquidCrystal_I2C lcd(LCD_I2C_Addr, 20, 4);  // Set the LCD I2C address. Use 20 Space 4-line LCD.
-
-
-// Initialize Arduino serial communications
-
-SoftwareSerial SWSerial(NOT_A_PIN, 10);  // RX on no pin (unused), TX on pin 10 (to S1).
-
-
-SoftwareSerial BTSerial(2, 3);  // For communication to with the Bluetooth Device
-
-int BT_Ena = 4;
-
-
-// Initialize Sabertooth driver passing it the Arduino serial communications object
-
-SabertoothSimplified ST(SWSerial);  // Use SWSerial as the serial port.
-
-int ST1_S2 = 8;  // Arduino pin attached to Sabertooth controller
-
-int ST2_S2 = 9;  // Arduino pin attached to Sabertooth controller
 
 int VM_1 = -1;
 int VM_2 = -1;
+
+int AM = 11;
 
 float mFLangle = -M_PI / 4,
  mFRangle = M_PI / 4,
@@ -107,116 +85,19 @@ float mFLangle = -M_PI / 4,
 
 float robotLength = 62.4, robotWidth = 43.6, motorLocAngle[4];
 int motorRotCont[4];
-
-// Sends motor testing information to LCD screen
-void motorMessage(int motorNum, int power) {
-
-  int lineNum = -1;
-
-  int colNum = -1;
-
-
-
-  switch (motorNum) {
-
-    case 1:  // Motor number
-
-      lineNum = 0;
-
-      colNum = 3;
-
-      break;
-
-    case 2:  // Motor number
-
-      lineNum = 0;
-
-      colNum = 11;
-
-      break;
-
-    case 3:  // Motor number
-
-      lineNum = 1;
-
-      colNum = 3;
-
-      break;
-
-    case 4:  // Motor number
-
-      lineNum = 1;
-
-      colNum = 11;
-
-      break;
-  }
-
-  lcd.setCursor(colNum, lineNum);
-
-  lcd.print(power);
-
-  lcd.print(" ");
-}
+Servo arm;
 
 // Initialize motor test parameters
 void setMotor(int motorNum, int power) {
+  
+
+  AF_DCMotor temp(motorNum);
 
 
 
-  int controllerNum = -1;  // Controller to be tested
-
-  int motorNumber = -1;  // Motor on that the Controller to be tested
-
-
-
-  switch (motorNum) {
-
-    case 1:  // Motor to be updated
-
-      controllerNum = ST2_S2;
-
-      motorNumber = 1;
-
-      break;
-
-    case 2:  // Motor to be updated
-
-      controllerNum = ST2_S2;
-
-      motorNumber = 2;
-
-      break;
-
-    case 3:  // Motor to be updated
-
-      controllerNum = ST1_S2;
-
-      motorNumber = 1;
-
-      break;
-
-    case 4:  // Motor to be updated
-
-      controllerNum = ST1_S2;
-
-      motorNumber = 2;
-
-      break;
-  }
-
-
-  // Set Motor power
-
-  digitalWrite(controllerNum, HIGH);
-
-  motorMessage(motorNum, power);
-
-  ST.motor(motorNumber, power);
-
-  delayMicroseconds(50);
-
-  digitalWrite(controllerNum, LOW);
+  if(power >= 0) temp.run(FORWARD);
+  else temp.run(BACKWARD);
+  temp.setSpeed(power);
 }
 
 // Limits all the motor speed to be between -1 to 1
@@ -272,62 +153,18 @@ void setup() {
   findMotorRotCont(2, mBRangle);
   findMotorRotCont(3, mBLangle);
 
- 
-  // Set Arduino pin for each sabertooth as OUTPUT
 
-  pinMode(ST1_S2, OUTPUT);  // Arduino pin control to sabertooth
+  pinMode(VM_1, OUTPUT);
 
-  pinMode(ST2_S2, OUTPUT);  // Arduino pin control to sabertooth
+  pinMode(VM_2, OUTPUT);
 
-  pinMode(BT_Ena, OUTPUT);  // Bluetooth ena pin
+  arm.attach(AM);
 
-  digitalWrite(BT_Ena, LOW);  // Set the Bluetooth ena low
-
-  // Start Serial Communications
-
-  SWSerial.begin(SerialBaudRate);  // Start the Sabretooth channel
-
-  BTSerial.begin(SerialBaudRate);  // Start the Bluetooth channel
-
+  // Start Serial Communcation
   Serial.begin(SerialBaudRate);
 
 
-  // Set up LCD
 
-  lcd.begin();
-
-  lcd.backlight();
-
-  lcd.write(12);
-
-  lcd.setCursor(0, 0);
-
-  lcd.print("Connection at: ");
-
-  lcd.print(SerialBaudRate);
-
-  lcd.setCursor(0, 1);
-
-  lcd.print("Test...");
-
-
-
-
-  lcd.setCursor(8, 1);
-
-  lcd.print("COMPLETE!");
-
-  delay(1000);
-
-  lcd.clear();
-
-  lcd.setCursor(0, 0);
-
-  lcd.print("M1:     M2: ");  // 'Ms' - Motor Speed for motor 1 and 2
-
-  lcd.setCursor(0, 1);
-
-  lcd.print("M3:     M4: ");  // 'Ms' - Motor Speed for motor 3 and 4
 }
 
 void loop() {
@@ -343,20 +180,23 @@ void loop() {
 
   Joy1_Y = analogRead(A0);  // get the left vertical (Y) joystick input
 
+  //Bad
   Joy1_X = analogRead(A1);  // get the left horizontal (X) joystick input
 
+  //bad
   Joy2_Y = analogRead(A2);  // get the right vertical (Y) joystick input
 
   Joy2_X = analogRead(A3);  // get the right horizontal (X) joystick input
+
+  //Serial.println((String)"Joy1y: " + Joy1_Y + " Joy2x: " + Joy1_X + "Joy2y: " + Joy2_Y + " Joy2x: " + Joy2_X);
 
   // maps the joysitck outputs to something the motor can use.
   // the motors take a value from -127 - 127
   // Map to 511 to improve accuracy when doing math
   yPwr = map(Joy1_Y, 0, 865, -511, 511);
   xPwr = map(Joy1_X, 0, 865, -511, 511);
-  spinPwr = 0;
-  spinPwr = map(Joy1_X, 0, 865, -511, 511);
-  //vertPwr = map(Joy2_Y, 0, 1023, -127, 127);  //Currently not simulated. Need to add 2 more motors
+  spinPwr = map(Joy2_X, 0, 865, -511, 511);
+  //vertPwr = map(Joy2_Y, 0, 1023, -127, 127);
 
   // converts the joystick 1 to polar coordinates
   int mag;
@@ -394,19 +234,31 @@ void loop() {
 
   // Set the power in each motor
 
-  setMotor(1, mFL);
+  //setVerticalMotor(1,127);
+
+  setMotor(1,127);
 
   delay(1);
 
-  setMotor(2, mFR);
+  setMotor(2, 127);
 
   delay(1);
 
-  setMotor(3, mBL);
+  setMotor(3, 127);
 
   delay(1);
 
-  setMotor(4, mBR);
+  setMotor(4, 127);
 
   delay(1);
+
+  for (int pos = 0; pos <= 180; pos += 1) { // goes from 0 degrees to 180 degrees
+    // in steps of 1 degree
+    arm.write(pos);              // tell servo to go to position in variable 'pos'
+    delay(15);                       // waits 15 ms for the servo to reach the position
+  }
+  for (int pos = 180; pos >= 0; pos -= 1) { // goes from 180 degrees to 0 degrees
+    arm.write(pos);              // tell servo to go to position in variable 'pos'
+    delay(15);                       // waits 15 ms for the servo to reach the position
+  }
 }
