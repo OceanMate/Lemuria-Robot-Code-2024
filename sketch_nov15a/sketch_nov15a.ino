@@ -57,20 +57,28 @@
 
 #include <Servo.h>
 
-#include <AFMotor.h>
-
 #include <Wire.h>
 
 #include <Math.h>
 
+#include <IBusBM.h>
 
-int SerialBaudRate = 9600;
+IBusBM ibus;
+
+
+
+int SerialBaudRate = 115200;
+
+int mflForwardID = -1, mflBackwardID = -1, mflSpeedID = -1,
+  mfrForwardID = -1, mfrBackwardID = -1, mfrSpeedID = -1,
+  mbrForwardID = -1, mbrBackwardID = -1, mbrSpeedID = -1,
+  mblForwardID = -1, mblBackwardID = -1, mblSpeedID = -1;
 
 
 int VM_1 = -1;
 int VM_2 = -1;
 
-int AM = -1;
+int ArmServo = 11;
 
 float mFLangle = -M_PI / 4,
  mFRangle = M_PI / 4,
@@ -81,19 +89,70 @@ float robotLength = 62.4, robotWidth = 43.6, motorLocAngle[4];
 int motorRotCont[4];
 Servo arm;
 
-// Initialize motor test parameters
+// RC controller variablies
+// 0 is joystick 1 x, 2 is joystick 1 y
+// 1 is joystick 2 y, 3 is joystick 2 x
+// 4 is switch a, 5 is switch b
+// 6 is dial a, 7 is dial b (not currently working (switch 5 affects this value?))
+// 8 is the 3-step switch c, 9 is switch d
+int const channelSize = 10;
+int rc_values[channelSize];
+
+int readChannel(byte channelInput, int minLimit, int maxLimit, int defaultValue) {
+  uint16_t ch = ibus.readChannel(channelInput);
+  if (ch < 100) return defaultValue;
+  return map(ch, 1000, 2000, minLimit, maxLimit);
+}
+
+bool readSwitch(byte channelInput, bool defaultValue) {
+  int intDefaultValue = (defaultValue) ? 100 : 0;
+  int ch = readChannel(channelInput, 0, 100, intDefaultValue);
+  return (ch > 50);
+}
+
+// Run moters, -100 to 100
 void setMotor(int motorNum, int power) {
+  int motorForward, motorBackward, motorSpeed;
+
+  switch (motorNum) {
+    case 1:
+    motorForward = mflForwardID;
+    motorBackward = mflBackwardID;
+    motorSpeed = mflSpeedID;
+    break;
+
+    case 2:
+    motorForward = mfrForwardID;
+    motorBackward = mfrBackwardID;
+    motorSpeed = mfrSpeedID;
+    break;
+
+    case 3;
+    motorForward = mbrForwardID;
+    motorBackward = mbrBackwardID;
+    motorSpeed = mbrSpeedID;
+    break;
+
+    case 4;
+    motorForward = mblForwardID;
+    motorBackward = mblBackwardID;
+    motorSpeed = mblSpeedID;
+    break;
+
+    default:
+    return;
+  }
   
-
-  AF_DCMotor temp(motorNum);
-
-
-
-  if(power >= 0) temp.run(FORWARD);
-  else temp.run(BACKWARD);
-  temp.setSpeed(power);
-
+  if (speed < 0) {
+    digitalWrite(motorForward, LOW);
+    digitalWrite(motorBackward, HIGH);
+  } else {
+    digitalWrite(motorForward, HIGH);
+    digitalWrite(motorBackward, LOW);
+  }
   
+  int speed = map(abs(power), -100, 100, 0, 255);
+  analogWrite(motorSpeed, abs(speed));
 }
 
 // Limits all the motor speed to be between -1 to 1
@@ -154,10 +213,12 @@ void setup() {
 
   pinMode(VM_2, OUTPUT);
 
-  arm.attach(AM);
+  arm.attach(ArmServo);
 
   // Start Serial Communcation
   Serial.begin(SerialBaudRate);
+  ibus.begin(Serial1);
+
 
 }
 
@@ -170,26 +231,35 @@ void loop() {
 
   int mFL, mFR, mBR, mBL, mV;
 
+  // RC controller variablies
+// 0 is joystick 1 x, 2 is joystick 1 y
+// 1 is joystick 2 y, 3 is joystick 2 x
+// 4 is switch a, 5 is switch b
+// 6 is dial a, 7 is dial b (not currently working (switch 5 affects this value?))
+// 8 is the 3-step switch c, 9 is switch d
+  for (byte i = 0; i < channelSize; i++) {
+    if (i < 4 | i == 6 | i == 7 | i == 8) {
+      rc_values[i] = readChannel(i, -100, 100, 0);
+    } else {
+      rc_values[i] = readSwitch(i, false);
+    }
 
-  Joy1_Y = analogRead(A0);  // get the left vertical (Y) joystick input
+    //Debug serial output for controller
+    /*Serial.print("Ch");
+    Serial.print(i + 1);
+    Serial.print(": ");
+    Serial.print(rc_values[i]);
+    Serial.print(" | ");*/
+  }
 
-  //Bad
-  Joy1_X = analogRead(A1);  // get the left horizontal (X) joystick input
-
-  //bad
-  Joy2_Y = analogRead(A2);  // get the right vertical (Y) joystick input
-
-  Joy2_X = analogRead(A3);  // get the right horizontal (X) joystick input
-
-  //Serial.println((String)"Joy1y: " + Joy1_Y + " Joy2x: " + Joy1_X + "Joy2y: " + Joy2_Y + " Joy2x: " + Joy2_X);
 
   // maps the joysitck outputs to something the motor can use.
   // the motors take a value from -127 - 127
   // Map to 511 to improve accuracy when doing math
-  yPwr = map(Joy1_Y, 0, 865, -511, 511);
-  xPwr = map(Joy1_X, 0, 865, -511, 511);
-  spinPwr = map(Joy2_X, 0, 865, -511, 511);
-  //vertPwr = map(Joy2_Y, 0, 1023, -127, 127);
+  yPwr = rc_values[1];
+  xPwr = rc_values[3];
+  spinPwr = rc_values[0];
+  vertPwr = rc_values[2];
 
   // converts the joystick 1 to polar coordinates
   int mag;
@@ -217,31 +287,24 @@ void loop() {
   }
 
   // Limits the speeds so they can't exceed the max speed of the motors
-  balanceSpeeds(511, mFL, mFR, mBL, mBR);
-
-  // scale back down to +-127
-  mFL /= 4;
-  mFR /= 4;
-  mBL /= 4;
-  mBR /= 4;
+  balanceSpeeds(100, mFL, mFR, mBL, mBR);
 
   // Set the power in each motor
-
   //setVerticalMotor(1,127);
 
- setMotor(1,255);
+  setMotor(1, mFL);
 
   delay(1);
 
-  //setMotor(2, 127);
+  setMotor(2, mFR);
 
   delay(1);
 
-  //setMotor(3, 127);
+  setMotor(3, mBR);
 
   delay(1);
 
-  //setMotor(4, 127);
+  setMotor(4, mBL);
 
   delay(1);
 
