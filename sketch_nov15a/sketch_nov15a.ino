@@ -66,17 +66,11 @@
 
 int SerialBaudRate = 9600;
 
-//set Hozantal motors
-/*AF_DCMotor HM_1(1);
-AF_DCMotor HM_2(2);
-AF_DCMotor HM_3(3);
-AF_DCMotor HM_4(4);*/
-
 
 int VM_1 = -1;
 int VM_2 = -1;
 
-int AM = 11;
+int AM = -1;
 
 float mFLangle = -M_PI / 4,
  mFRangle = M_PI / 4,
@@ -98,6 +92,8 @@ void setMotor(int motorNum, int power) {
   if(power >= 0) temp.run(FORWARD);
   else temp.run(BACKWARD);
   temp.setSpeed(power);
+
+  
 }
 
 // Limits all the motor speed to be between -1 to 1
@@ -163,12 +159,9 @@ void setup() {
   // Start Serial Communcation
   Serial.begin(SerialBaudRate);
 
-
-
 }
 
 void loop() {
-
 
 
   int Joy1_X, Joy1_Y, Joy2_X, Joy2_Y;
@@ -236,29 +229,21 @@ void loop() {
 
   //setVerticalMotor(1,127);
 
-  setMotor(1,127);
+ setMotor(1,255);
 
   delay(1);
 
-  setMotor(2, 127);
+  //setMotor(2, 127);
 
   delay(1);
 
-  setMotor(3, 127);
+  //setMotor(3, 127);
 
   delay(1);
 
-  setMotor(4, 127);
+  //setMotor(4, 127);
 
   delay(1);
 
-  for (int pos = 0; pos <= 180; pos += 1) { // goes from 0 degrees to 180 degrees
-    // in steps of 1 degree
-    arm.write(pos);              // tell servo to go to position in variable 'pos'
-    delay(15);                       // waits 15 ms for the servo to reach the position
-  }
-  for (int pos = 180; pos >= 0; pos -= 1) { // goes from 180 degrees to 0 degrees
-    arm.write(pos);              // tell servo to go to position in variable 'pos'
-    delay(15);                       // waits 15 ms for the servo to reach the position
-  }
+
 }
