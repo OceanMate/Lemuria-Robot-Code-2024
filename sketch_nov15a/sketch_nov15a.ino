@@ -127,13 +127,13 @@ void setMotor(int motorNum, int power) {
     motorSpeed = mfrSpeedID;
     break;
 
-    case 3;
+    case 3:
     motorForward = mbrForwardID;
     motorBackward = mbrBackwardID;
     motorSpeed = mbrSpeedID;
     break;
 
-    case 4;
+    case 4:
     motorForward = mblForwardID;
     motorBackward = mblBackwardID;
     motorSpeed = mblSpeedID;
@@ -143,7 +143,7 @@ void setMotor(int motorNum, int power) {
     return;
   }
   
-  if (speed < 0) {
+  if (power < 0) {
     digitalWrite(motorForward, LOW);
     digitalWrite(motorBackward, HIGH);
   } else {
@@ -151,8 +151,8 @@ void setMotor(int motorNum, int power) {
     digitalWrite(motorBackward, LOW);
   }
   
-  int speed = map(abs(power), -100, 100, 0, 255);
-  analogWrite(motorSpeed, abs(speed));
+  //int speed = map(abs(power), 0, 100, 0, 255);
+  analogWrite(motorSpeed, abs(power));
 }
 
 // Limits all the motor speed to be between -1 to 1
@@ -239,7 +239,7 @@ void loop() {
 // 8 is the 3-step switch c, 9 is switch d
   for (byte i = 0; i < channelSize; i++) {
     if (i < 4 | i == 6 | i == 7 | i == 8) {
-      rc_values[i] = readChannel(i, -100, 100, 0);
+      rc_values[i] = readChannel(i, -255, 255, 0);
     } else {
       rc_values[i] = readSwitch(i, false);
     }
@@ -287,7 +287,7 @@ void loop() {
   }
 
   // Limits the speeds so they can't exceed the max speed of the motors
-  balanceSpeeds(100, mFL, mFR, mBL, mBR);
+  balanceSpeeds(255, mFL, mFR, mBL, mBR);
 
   // Set the power in each motor
   //setVerticalMotor(1,127);
