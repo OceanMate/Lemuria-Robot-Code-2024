@@ -177,7 +177,7 @@ void loop() {
   int Joy1_X, Joy1_Y, Joy2_X, Joy2_Y;
 
   int yPwr, xPwr, vertPwr, spinPwr;
-  
+
   int xyMotorSpeeds[xyMotorAmount], mV;
 
   // RC controller variablies
@@ -201,14 +201,10 @@ void loop() {
     Serial.print(" | ");*/
   }
 
-
-  // maps the joysitck outputs to something the motor can use.
-  // the motors take a value from -127 - 127
-  // Map to 511 to improve accuracy when doing math
   yPwr = rc_values[1];
   xPwr = rc_values[3];
   spinPwr = rc_values[0];
-  vertPwr = rc_values[2];
+  vertPwr = rc_values[2] / 2;
 
   // converts the joystick 1 to polar coordinates
   int mag;
