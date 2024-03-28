@@ -1,60 +1,3 @@
-// Serial SaberTooth Motor Test
-
-// authors: Scott Fraser & LeRoy van der Vegt
-
-// created: July 2020
-
-// Creative license use freely
-
-//
-
-// This tests 2 Sabertooth controllers and 4 motors.  Each motor will be tested forward and reverse.
-
-// Test status displayed on a 4x20 LCD screen.  Pins for each Sabertooth controller have to be set
-
-// in the following order.
-
-//
-
-//    Simplified Serial Mode 3 (MicroController controlled-Arduino)
-
-//    pin 1 - ON     (Lithum battery - ON, other battery type - OFF)
-
-//    pin 2 - OFF    (R/C radio control signal control - loss of signal stop motors; active-ON, not active-OFF)
-
-//    pin 3 - ON     (Lithum battery voltage protection - protection-OFF, no protection-ON)
-
-//    pin 4 - OFF    (set Baud rate of serial connection @9600 see below)
-
-//    pin 5 - ON     (set Baud rate of serial connection @9600 see below)
-
-//    pin 6 - OFF    (Serial Slave - controllers are independent-OFF controller are synchronized-ON)
-
-//
-
-//    Different baud rate for pin 4 and 5
-
-//    baud  pin  pin
-
-//    rate   4    5
-
-//    ----- ---  ---
-
-//    2400  ON   ON
-
-//    9600  OFF  ON   <------  9600 baud is used in this sketch
-
-//    19200 ON   OFF
-
-//    38400 OFF  OFF
-
-//
-
-
-// Arduino Serial communications
-
-#include <SoftwareSerial.h>  // used for Sabretooth & BlueTooth
-
 #include <Servo.h>
 
 #include <Wire.h>
@@ -63,31 +6,40 @@
 
 #include <IBusBM.h>
 
+// Controller variable
 IBusBM ibus;
-
-
 
 int SerialBaudRate = 115200;
 
-int mflForwardID = -1, mflBackwardID = -1, mflSpeedID = -1,
+// Arduino ports x,y motors are connected to (-1 right now to represent temp values)
+// Forward and backwards are digital pins and speeds are anolog pins
+const int mflForwardID = -1, mflBackwardID = -1, mflSpeedID = -1,
   mfrForwardID = -1, mfrBackwardID = -1, mfrSpeedID = -1,
   mbrForwardID = -1, mbrBackwardID = -1, mbrSpeedID = -1,
   mblForwardID = -1, mblBackwardID = -1, mblSpeedID = -1;
 
+// Arduino ports for vertical motors. Connect to anolog ports(-1 right now to represent temp values)
+const int VM_1 = -1, VM_2 = -1;
 
-int VM_1 = -1;
-int VM_2 = -1;
+const int xyMotorAmount = 4;
 
-int ArmServo = 11;
+// Various constants used to calculate the Rotation Constant
+float const robotLength = 62.4, robotWidth = 43.6, 
+// Angle of the x,y motors from the center of the robot
+  motorLocAngle[xyMotorAmount] = {atan2(robotWidth/2, robotLength/2), atan2(-robotWidth/2, robotLength/2),
+  atan2(-robotWidth/2, -robotLength/2), atan2(robotWidth/2, -robotLength/2)}, 
+// Angle of the x,y motors. Assumes forward is 0 and counterclockwise is positive
+// Direction of Forward thrust defines the motor angle
+  motorAngle[xyMotorAmount] = {-M_PI / 4, M_PI / 4, M_PI * (3.0 / 4), -M_PI * (3.0 / 4)};
 
-float mFLangle = -M_PI / 4,
- mFRangle = M_PI / 4,
- mBRangle = M_PI * (3.0 / 4),
- mBLangle = -M_PI * (3.0 / 4);
+// A constant of ethier -1 or 1 that is used to detemine wether an 
+// x,y motor should go forwards or backwards while turning 
+// (value can be 0 if motor doesn't contribute to turning)
+int motorRotCont[xyMotorAmount];
 
-float robotLength = 62.4, robotWidth = 43.6, motorLocAngle[4];
-int motorRotCont[4];
 Servo arm;
+// Arduino port for arm servo. Connects to a digital pin
+int ArmServoID = 11;
 
 // RC controller variablies
 // 0 is joystick 1 x, 2 is joystick 1 y
@@ -98,19 +50,21 @@ Servo arm;
 int const channelSize = 10;
 int rc_values[channelSize];
 
+// Reads a joystick, dial, or 3 step switch off controller
 int readChannel(byte channelInput, int minLimit, int maxLimit, int defaultValue) {
   uint16_t ch = ibus.readChannel(channelInput);
   if (ch < 100) return defaultValue;
   return map(ch, 1000, 2000, minLimit, maxLimit);
 }
 
+// Reads a switch from the controller
 bool readSwitch(byte channelInput, bool defaultValue) {
   int intDefaultValue = (defaultValue) ? 100 : 0;
   int ch = readChannel(channelInput, 0, 100, intDefaultValue);
   return (ch > 50);
 }
 
-// Run moters, -100 to 100
+// Runs x,y motors, power should be a value from -255 to 255
 void setMotor(int motorNum, int power) {
   int motorForward, motorBackward, motorSpeed;
 
@@ -155,27 +109,29 @@ void setMotor(int motorNum, int power) {
   analogWrite(motorSpeed, abs(power));
 }
 
-// Limits all the motor speed to be between -1 to 1
-void balanceSpeeds(int limit, int& value1, int& value2, int& value3, int& value4) {
+// finds if any value is greater than the limit, then balances out all speeds to be lower than the limit 
+void balanceSpeeds(int limit, int motorSpeeds[], int size) {
   double maxValue = 0;
-  if (maxValue < abs(value1) && abs(value1) > limit) maxValue = abs(value1);
-  if (maxValue < abs(value2) && abs(value2) > limit) maxValue = abs(value2);
-  if (maxValue < abs(value3) && abs(value3) > limit) maxValue = abs(value3);
-  if (maxValue < abs(value4) && abs(value4) > limit) maxValue = abs(value4);
+  for (int i = 0; i < size; i++) {
+    if (maxValue < abs(motorSpeeds[i]) && abs(motorSpeeds[i]) > limit)
+      maxValue = abs(motorSpeeds[i]);
+  }
 
+  // returns if no value is greater than the limit
   if (maxValue == 0) return;
 
-  value1 = (value1/maxValue) * limit;
-  value2 = (value2/maxValue) * limit;
-  value3 = (value3/maxValue) * limit;
-  value4 = (value4/maxValue) * limit;
+  for (int i = 0; i < size; i++) {
+    motorSpeeds[i] = (int)((motorSpeeds[i]/maxValue) * limit);
+  }
 }
 
-// Finds the number to mulitple the turning for each motor 
-void findMotorRotCont(int indexValue, double motorAngle) {
+// Finds the number to multiply the turning speed for each motor 
+void findMotorRotCont(int indexValue) {
+  double motorRotationEffectiveness = sin(motorLocAngle[indexValue] - motorAngle[indexValue]);
 
-  if (sin(motorLocAngle[indexValue] - motorAngle) != 0)
-    motorRotCont[indexValue] = (int)(sin(motorLocAngle[indexValue] - motorAngle) / abs(sin(motorLocAngle[indexValue] - motorAngle)));
+  if (motorRotationEffectiveness != 0)
+    // Balances the value to be either -1 or 1
+    motorRotCont[indexValue] = (int)(motorRotationEffectiveness / abs(motorRotationEffectiveness));
   else motorRotCont[indexValue] = 0;
 }
 
@@ -198,28 +154,21 @@ void setVerticalMotor(int motorNum, int power) {
 }
 
 void setup() {
-  motorLocAngle[0] = atan2(robotWidth/2, robotLength/2);
-  motorLocAngle[1] = atan2(-robotWidth/2, robotLength/2);
-  motorLocAngle[2] = atan2(-robotWidth/2, -robotLength/2);
-  motorLocAngle[3] = atan2(robotWidth/2, -robotLength/2);
+  // Calculate motor Rotation Contstant
+  for (int i = 0; i < xyMotorAmount; i++)
+    findMotorRotCont(i);
 
-  findMotorRotCont(0, mFLangle);
-  findMotorRotCont(1, mFRangle);
-  findMotorRotCont(2, mBRangle);
-  findMotorRotCont(3, mBLangle);
-
-
+  // Attaches the vertical motors to an anolog pins 
   pinMode(VM_1, OUTPUT);
-
   pinMode(VM_2, OUTPUT);
 
-  arm.attach(ArmServo);
+  // Sets up the arm servo
+  arm.attach(ArmServoID);
 
   // Start Serial Communcation
   Serial.begin(SerialBaudRate);
+  // Start Controller Communcation
   ibus.begin(Serial1);
-
-
 }
 
 void loop() {
@@ -228,15 +177,15 @@ void loop() {
   int Joy1_X, Joy1_Y, Joy2_X, Joy2_Y;
 
   int yPwr, xPwr, vertPwr, spinPwr;
-
-  int mFL, mFR, mBR, mBL, mV;
+  
+  int xyMotorSpeeds[xyMotorAmount], mV;
 
   // RC controller variablies
-// 0 is joystick 1 x, 2 is joystick 1 y
-// 1 is joystick 2 y, 3 is joystick 2 x
-// 4 is switch a, 5 is switch b
-// 6 is dial a, 7 is dial b (not currently working (switch 5 affects this value?))
-// 8 is the 3-step switch c, 9 is switch d
+  // 0 is joystick 1 x, 2 is joystick 1 y
+  // 1 is joystick 2 y, 3 is joystick 2 x
+  // 4 is switch a, 5 is switch b
+  // 6 is dial a, 7 is dial b (not currently working (switch 5 affects this value?))
+  // 8 is the 3-step switch c, 9 is switch d
   for (byte i = 0; i < channelSize; i++) {
     if (i < 4 | i == 6 | i == 7 | i == 8) {
       rc_values[i] = readChannel(i, -255, 255, 0);
@@ -273,40 +222,24 @@ void loop() {
   mag = (int) sqrt(((long)yPwr * yPwr) + ((long)xPwr * xPwr));
 
 
-  // only does the larger spin or x,y movement
+  // only does the larger of spin or x,y movement
   if (mag >= abs(spinPwr)) {
-    mFL = (int)(mag * cos(angle + mFLangle));
-    mFR = (int)(mag * cos(angle + mFRangle));
-    mBR = (int)(mag * cos(angle + mBRangle));
-    mBL = (int)(mag * cos(angle + mBLangle));
+    for (int i = 0; i < xyMotorAmount; i++)
+      xyMotorSpeeds[i] = (int)(mag * cos(angle + motorAngle[i]));
   } else {
-    mFL = spinPwr * motorRotCont[0];
-    mFR = spinPwr * motorRotCont[1];
-    mBR = spinPwr * motorRotCont[2];
-    mBL = spinPwr * motorRotCont[3];
+    for (int i = 0; i < xyMotorAmount; i++)
+      xyMotorSpeeds[i] = spinPwr * motorRotCont[i];
   }
 
   // Limits the speeds so they can't exceed the max speed of the motors
-  balanceSpeeds(255, mFL, mFR, mBL, mBR);
+  balanceSpeeds(255, xyMotorSpeeds, xyMotorAmount);
 
-  // Set the power in each motor
-  //setVerticalMotor(1,127);
+  // Set the power in vertical motors
+  setVerticalMotor(1, vertPwr);
+  setVerticalMotor(2, vertPwr);
 
-  setMotor(1, mFL);
-
-  delay(1);
-
-  setMotor(2, mFR);
-
-  delay(1);
-
-  setMotor(3, mBR);
-
-  delay(1);
-
-  setMotor(4, mBL);
-
-  delay(1);
-
-
+  // Set the power in x,y motors
+  for (int i = 0; i < xyMotorAmount; i++) {
+    setMotor(i+1, xyMotorSpeeds[i]);
+  }
 }
