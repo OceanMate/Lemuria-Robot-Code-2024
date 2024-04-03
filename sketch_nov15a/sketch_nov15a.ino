@@ -1,3 +1,12 @@
+/*
+ by: Maximus Theis and Sawyer Theis
+ date: April 1, 2024
+ license: Beerware - Use this code however you'd like. If you
+ find it useful you can buy me a beer some time.
+
+*/
+
+
 #include <Servo.h>
 
 #include <Wire.h>
@@ -5,6 +14,10 @@
 #include <Math.h>
 
 #include <IBusBM.h>
+
+//IMU imports
+#include "quaternionFilters.h"
+#include "MPU9250.h"
 
 // Controller variable
 IBusBM ibus;
