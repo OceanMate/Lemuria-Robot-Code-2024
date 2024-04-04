@@ -1,0 +1,514 @@
+/*
+ by: Maximus Theis and Sawyer Theis
+ date: April 1, 2024
+ license: Beerware - Use this code however you'd like. If you
+ find it useful you can buy me a beer some time.
+
+*/
+
+
+#include <Servo.h>
+
+#include <Wire.h>
+
+#include <Math.h>
+
+#include <IBusBM.h>
+
+//IMU imports
+#include "quaternionFilters.h"
+#include "MPU9250.h"
+
+//Set IMU
+#define I2Cclock 400000
+#define I2Cport Wire
+#define MPU9250_ADDRESS MPU9250_ADDRESS_AD0  // Use either this line or the next to select which I2C address your device is using
+//#define MPU9250_ADDRESS MPU9250_ADDRESS_AD1
+
+MPU9250 myIMU(MPU9250_ADDRESS, I2Cport, I2Cclock);
+float imuYawOffset =0,imuPitchOffset=0,imuRollOffset=0;
+
+
+// Controller variable
+IBusBM ibus;
+
+int SerialBaudRate = 115200;
+// Set to true to get Serial output for debugging
+bool serialDebug = true;
+
+// Arduino ports x,y motors are connected to (-1 right now to represent temp values)
+// Forward and backwards are digital pins and speeds are anolog pins
+const int mflForwardID = -1, mflBackwardID = -1, mflSpeedID = -1,
+          mfrForwardID = -1, mfrBackwardID = -1, mfrSpeedID = -1,
+          mbrForwardID = -1, mbrBackwardID = -1, mbrSpeedID = -1,
+          mblForwardID = -1, mblBackwardID = -1, mblSpeedID = -1;
+
+// Arduino ports for vertical motors. Connect to anolog ports(-1 right now to represent temp values)
+const int VM_1 = -1, VM_2 = -1;
+
+const int xyMotorAmount = 4;
+
+// Various constants used to calculate the Rotation Constant
+float const robotLength = 62.4, robotWidth = 43.6,
+            // Angle of the x,y motors from the center of the robot
+  motorLocAngle[xyMotorAmount] = { atan2(robotWidth / 2, robotLength / 2), atan2(-robotWidth / 2, robotLength / 2),
+                                   atan2(-robotWidth / 2, -robotLength / 2), atan2(robotWidth / 2, -robotLength / 2) },
+            // Angle of the x,y motors. Assumes forward is 0 and counterclockwise is positive
+  // Direction of Forward thrust defines the motor angle
+  motorAngle[xyMotorAmount] = { -M_PI / 4, M_PI / 4, M_PI*(3.0 / 4), -M_PI*(3.0 / 4) };
+
+// A constant of ethier -1 or 1 that is used to detemine wether an
+// x,y motor should go forwards or backwards while turning
+// (value can be 0 if motor doesn't contribute to turning)
+int motorRotCont[xyMotorAmount];
+
+Servo arm;
+// Arduino port for arm servo. Connects to a digital pin
+int ArmServoID = 11;
+
+// RC controller variablies
+// 0 is joystick 1 x, 2 is joystick 1 y
+// 1 is joystick 2 y, 3 is joystick 2 x
+// 4 is switch a, 5 is switch b
+// 6 is dial a, 7 is dial b (not currently working (switch 5 affects this value?))
+// 8 is the 3-step switch c, 9 is switch d
+int const channelSize = 10;
+int rc_values[channelSize];
+
+//initilize IMU
+void imuInit() {
+  // Read the WHO_AM_I register, this is a good test of communication
+  byte c = myIMU.readByte(MPU9250_ADDRESS, WHO_AM_I_MPU9250);
+  Serial.print(F("MPU9250 I AM 0x"));
+  Serial.print(c, HEX);
+  Serial.print(F(" I should be 0x"));
+  Serial.println(0x71, HEX);
+
+  if (c == 0x71)  // WHO_AM_I should always be 0x71
+  {
+    Serial.println(F("MPU9250 is online..."));
+
+    // Start by performing self test and reporting values
+    myIMU.MPU9250SelfTest(myIMU.selfTest);
+    Serial.print(F("x-axis self test: acceleration trim within : "));
+    Serial.print(myIMU.selfTest[0], 1);
+    Serial.println("% of factory value");
+    Serial.print(F("y-axis self test: acceleration trim within : "));
+    Serial.print(myIMU.selfTest[1], 1);
+    Serial.println("% of factory value");
+    Serial.print(F("z-axis self test: acceleration trim within : "));
+    Serial.print(myIMU.selfTest[2], 1);
+    Serial.println("% of factory value");
+    Serial.print(F("x-axis self test: gyration trim within : "));
+    Serial.print(myIMU.selfTest[3], 1);
+    Serial.println("% of factory value");
+    Serial.print(F("y-axis self test: gyration trim within : "));
+    Serial.print(myIMU.selfTest[4], 1);
+    Serial.println("% of factory value");
+    Serial.print(F("z-axis self test: gyration trim within : "));
+    Serial.print(myIMU.selfTest[5], 1);
+    Serial.println("% of factory value");
+
+    // Calibrate gyro and accelerometers, load biases in bias registers
+    myIMU.calibrateMPU9250(myIMU.gyroBias, myIMU.accelBias);
+
+    myIMU.initMPU9250();
+    // Initialize device for active mode read of acclerometer, gyroscope, and
+    // temperature
+    Serial.println("MPU9250 initialized for active data mode....");
+
+    // Read the WHO_AM_I register of the magnetometer, this is a good test of
+    // communication
+    byte d = myIMU.readByte(AK8963_ADDRESS, WHO_AM_I_AK8963);
+    Serial.print("AK8963 ");
+    Serial.print("I AM 0x");
+    Serial.print(d, HEX);
+    Serial.print(" I should be 0x");
+    Serial.println(0x48, HEX);
+
+    if (d != 0x48) {
+      // Communication failed, stop here
+      Serial.println(F("Communication failed, abort!"));
+      Serial.flush();
+      abort();
+    }
+
+    // Get magnetometer calibration from AK8963 ROM
+    myIMU.initAK8963(myIMU.factoryMagCalibration);
+    // Initialize device for active mode read of magnetometer
+    Serial.println("AK8963 initialized for active data mode....");
+
+    if (SerialDebug) {
+      //  Serial.println("Calibration values: ");
+      Serial.print("X-Axis factory sensitivity adjustment value ");
+      Serial.println(myIMU.factoryMagCalibration[0], 2);
+      Serial.print("Y-Axis factory sensitivity adjustment value ");
+      Serial.println(myIMU.factoryMagCalibration[1], 2);
+      Serial.print("Z-Axis factory sensitivity adjustment value ");
+      Serial.println(myIMU.factoryMagCalibration[2], 2);
+    }
+
+    // Get sensor resolutions, only need to do this once
+    myIMU.getAres();
+    myIMU.getGres();
+    myIMU.getMres();
+
+    // The next call delays for 4 seconds, and then records about 15 seconds of
+    // data to calculate bias and scale.
+    //    myIMU.magCalMPU9250(myIMU.magBias, myIMU.magScale);
+    Serial.println("AK8963 mag biases (mG)");
+    Serial.println(myIMU.magBias[0]);
+    Serial.println(myIMU.magBias[1]);
+    Serial.println(myIMU.magBias[2]);
+
+    Serial.println("AK8963 mag scale (mG)");
+    Serial.println(myIMU.magScale[0]);
+    Serial.println(myIMU.magScale[1]);
+    Serial.println(myIMU.magScale[2]);
+    //    delay(2000); // Add delay to see results before serial spew of data
+
+    if (SerialDebug) {
+      Serial.println("Magnetometer:");
+      Serial.print("X-Axis sensitivity adjustment value ");
+      Serial.println(myIMU.factoryMagCalibration[0], 2);
+      Serial.print("Y-Axis sensitivity adjustment value ");
+      Serial.println(myIMU.factoryMagCalibration[1], 2);
+      Serial.print("Z-Axis sensitivity adjustment value ");
+      Serial.println(myIMU.factoryMagCalibration[2], 2);
+    }
+
+  }  // if (c == 0x71)
+  else {
+    Serial.print("Could not connect to MPU9250: 0x");
+    Serial.println(c, HEX);
+
+    // Communication failed, stop here
+    Serial.println(F("Communication failed, abort!"));
+    Serial.flush();
+    abort();
+  }
+}
+
+/*
+* Update imu values and print values if debug = true
+*/
+
+void imuUpdate() {
+  // If intPin goes high, all data registers have new data
+  // On interrupt, check if data ready interrupt
+  if (myIMU.readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01) {
+    myIMU.readAccelData(myIMU.accelCount);  // Read the x/y/z adc values
+
+    // Now we'll calculate the accleration value into actual g's
+    // This depends on scale being set
+    myIMU.ax = (float)myIMU.accelCount[0] * myIMU.aRes;  // - myIMU.accelBias[0];
+    myIMU.ay = (float)myIMU.accelCount[1] * myIMU.aRes;  // - myIMU.accelBias[1];
+    myIMU.az = (float)myIMU.accelCount[2] * myIMU.aRes;  // - myIMU.accelBias[2];
+
+    myIMU.readGyroData(myIMU.gyroCount);  // Read the x/y/z adc values
+
+    // Calculate the gyro value into actual degrees per second
+    // This depends on scale being set
+    myIMU.gx = (float)myIMU.gyroCount[0] * myIMU.gRes;
+    myIMU.gy = (float)myIMU.gyroCount[1] * myIMU.gRes;
+    myIMU.gz = (float)myIMU.gyroCount[2] * myIMU.gRes;
+
+    myIMU.readMagData(myIMU.magCount);  // Read the x/y/z adc values
+
+    // Calculate the magnetometer values in milliGauss
+    // Include factory calibration per data sheet and user environmental
+    // corrections
+    // Get actual magnetometer value, this depends on scale being set
+    myIMU.mx = (float)myIMU.magCount[0] * myIMU.mRes
+                 * myIMU.factoryMagCalibration[0]
+               - myIMU.magBias[0];
+    myIMU.my = (float)myIMU.magCount[1] * myIMU.mRes
+                 * myIMU.factoryMagCalibration[1]
+               - myIMU.magBias[1];
+    myIMU.mz = (float)myIMU.magCount[2] * myIMU.mRes
+                 * myIMU.factoryMagCalibration[2]
+               - myIMU.magBias[2];
+
+    // Must be called before updating quaternions!
+    myIMU.updateTime();
+
+    // Sensors x (y)-axis of the accelerometer is aligned with the y (x)-axis of
+    // the magnetometer; the magnetometer z-axis (+ down) is opposite to z-axis
+    // (+ up) of accelerometer and gyro! We have to make some allowance for this
+    // orientationmismatch in feeding the output to the quaternion filter. For the
+    // MPU-9250, we have chosen a magnetic rotation that keeps the sensor forward
+    // along the x-axis just like in the LSM9DS0 sensor. This rotation can be
+    // modified to allow any convenient orientation convention. This is ok by
+    // aircraft orientation standards! Pass gyro rate as rad/s
+    MahonyQuaternionUpdate(myIMU.ax, myIMU.ay, myIMU.az, myIMU.gx * DEG_TO_RAD,
+                           myIMU.gy * DEG_TO_RAD, myIMU.gz * DEG_TO_RAD, myIMU.my,
+                           myIMU.mx, myIMU.mz, myIMU.deltat);
+
+
+    // Serial print and/or display at 0.5 s rate independent of data rates
+    myIMU.delt_t = millis() - myIMU.count;
+
+    // Define output variables from updated quaternion---these are Tait-Bryan
+    // angles, commonly used in aircraft orientation. In this coordinate system,
+    // the positive z-axis is down toward Earth. Yaw is the angle between Sensor
+    // x-axis and Earth magnetic North (or true North if corrected for local
+    // declination, looking down on the sensor positive yaw is counterclockwise.
+    // Pitch is angle between sensor x-axis and Earth ground plane, toward the
+    // Earth is positive, up toward the sky is negative. Roll is angle between
+    // sensor y-axis and Earth ground plane, y-axis up is positive roll. These
+    // arise from the definition of the homogeneous rotation matrix constructed
+    // from quaternions. Tait-Bryan angles as well as Euler angles are
+    // non-commutative; that is, the get the correct orientation the rotations
+    // must be applied in the correct order which for this configuration is yaw,
+    // pitch, and then roll.
+    // For more see
+    // http://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
+    // which has additional links.
+    myIMU.yaw = atan2(2.0f * (*(getQ() + 1) * *(getQ() + 2) + *getQ() * *(getQ() + 3)), *getQ() * *getQ() + *(getQ() + 1) * *(getQ() + 1) - *(getQ() + 2) * *(getQ() + 2) - *(getQ() + 3) * *(getQ() + 3));
+    myIMU.pitch = -asin(2.0f * (*(getQ() + 1) * *(getQ() + 3) - *getQ() * *(getQ() + 2)));
+    myIMU.roll = atan2(2.0f * (*getQ() * *(getQ() + 1) + *(getQ() + 2) * *(getQ() + 3)), *getQ() * *getQ() - *(getQ() + 1) * *(getQ() + 1) - *(getQ() + 2) * *(getQ() + 2) + *(getQ() + 3) * *(getQ() + 3));
+    myIMU.pitch *= RAD_TO_DEG;
+    myIMU.yaw *= RAD_TO_DEG;
+
+    // Declination of SparkFun Electronics (40°05'26.6"N 105°11'05.9"W) is
+    // 	8° 30' E  ± 0° 21' (or 8.5°) on 2016-07-19
+    // - http://www.ngdc.noaa.gov/geomag-web/#declination
+    myIMU.yaw -= 2.65;
+    myIMU.roll *= RAD_TO_DEG;
+
+    //apply offset for zeroing imu
+    myIMU.yaw = myIMU.yaw - atan2(sin(imuYawOffset/RAD_TO_DEG), cos(imuYawOffset/RAD_TO_DEG))*RAD_TO_DEG;
+    myIMU.pitch = myIMU.pitch - atan2(sin(imuPitchOffset/RAD_TO_DEG), cos(imuPitchOffset/RAD_TO_DEG))*RAD_TO_DEG;
+    myIMU.roll = myIMU.roll - atan2(sin(imuRollOffset/RAD_TO_DEG), cos(imuRollOffset/RAD_TO_DEG))*RAD_TO_DEG;
+  }  // if (readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01)
+
+
+
+  // update debug once per half-second independent of read rate
+  if (myIMU.delt_t > 500) {
+    if (SerialDebug) {
+      Serial.print("ax = ");
+      Serial.print((int)1000 * myIMU.ax);
+      Serial.print(" ay = ");
+      Serial.print((int)1000 * myIMU.ay);
+      Serial.print(" az = ");
+      Serial.print((int)1000 * myIMU.az);
+      Serial.println(" mg");
+    }
+
+    if (SerialDebug) {
+      Serial.print("Yaw, Pitch, Roll: ");
+      Serial.print(myIMU.yaw, 2);
+      Serial.print(", ");
+      Serial.print(myIMU.pitch, 2);
+      Serial.print(", ");
+      Serial.println(myIMU.roll, 2);
+    }
+
+    myIMU.count = millis();
+    myIMU.sumCount = 0;
+    myIMU.sum = 0;
+  }  // if (myIMU.delt_t > 500)
+}
+
+void imuZero() {
+  imuYawOffset = myIMU.yaw;
+  imuPitchOffset = myIMU.pitch;
+  imuRollOffset = myIMU.roll;
+}
+
+// Reads a joystick, dial, or 3 step switch off controller
+int readChannel(byte channelInput, int minLimit, int maxLimit, int defaultValue) {
+  uint16_t ch = ibus.readChannel(channelInput);
+  if (ch < 100) return defaultValue;
+  return map(ch, 1000, 2000, minLimit, maxLimit);
+}
+
+// Reads a switch from the controller
+bool readSwitch(byte channelInput, bool defaultValue) {
+  int intDefaultValue = (defaultValue) ? 100 : 0;
+  int ch = readChannel(channelInput, 0, 100, intDefaultValue);
+  return (ch > 50);
+}
+
+// Runs x,y motors, power should be a value from -255 to 255
+void setMotor(int motorNum, int power) {
+  int motorForward, motorBackward, motorSpeed;
+
+  switch (motorNum) {
+    case 1:
+      motorForward = mflForwardID;
+      motorBackward = mflBackwardID;
+      motorSpeed = mflSpeedID;
+      break;
+
+    case 2:
+      motorForward = mfrForwardID;
+      motorBackward = mfrBackwardID;
+      motorSpeed = mfrSpeedID;
+      break;
+
+    case 3:
+      motorForward = mbrForwardID;
+      motorBackward = mbrBackwardID;
+      motorSpeed = mbrSpeedID;
+      break;
+
+    case 4:
+      motorForward = mblForwardID;
+      motorBackward = mblBackwardID;
+      motorSpeed = mblSpeedID;
+      break;
+
+    default:
+      return;
+  }
+
+  if (power < 0) {
+    digitalWrite(motorForward, LOW);
+    digitalWrite(motorBackward, HIGH);
+  } else {
+    digitalWrite(motorForward, HIGH);
+    digitalWrite(motorBackward, LOW);
+  }
+
+  //int speed = map(abs(power), 0, 100, 0, 255);
+  analogWrite(motorSpeed, abs(power));
+}
+
+// finds if any value is greater than the limit, then balances out all speeds to be lower than the limit
+void balanceSpeeds(int limit, int motorSpeeds[], int size) {
+  double maxValue = 0;
+  for (int i = 0; i < size; i++) {
+    if (maxValue < abs(motorSpeeds[i]) && abs(motorSpeeds[i]) > limit)
+      maxValue = abs(motorSpeeds[i]);
+  }
+
+  // returns if no value is greater than the limit
+  if (maxValue == 0) return;
+
+  for (int i = 0; i < size; i++) {
+    motorSpeeds[i] = (int)((motorSpeeds[i] / maxValue) * limit);
+  }
+}
+
+// Finds the number to multiply the turning speed for each motor
+void findMotorRotCont(int indexValue) {
+  double motorRotationEffectiveness = sin(motorLocAngle[indexValue] - motorAngle[indexValue]);
+
+  if (motorRotationEffectiveness != 0)
+    // Balances the value to be either -1 or 1
+    motorRotCont[indexValue] = (int)(motorRotationEffectiveness / abs(motorRotationEffectiveness));
+  else motorRotCont[indexValue] = 0;
+}
+
+// Sets the speed for one of the vertical motors.
+// MotorNum should be 1 or 2 Power should be from -127 to 127
+void setVerticalMotor(int motorNum, int power) {
+  int pin;
+  switch (motorNum) {
+    case 1:
+      pin = VM_1;
+      break;
+    case 2:
+      pin = VM_2;
+      break;
+    default:
+      return;
+  }
+
+  analogWrite(pin, power + 127);
+}
+
+void setup() {
+  // Calculate motor Rotation Contstant
+  for (int i = 0; i < xyMotorAmount; i++)
+    findMotorRotCont(i);
+
+  // Attaches the vertical motors to an anolog pins
+  pinMode(VM_1, OUTPUT);
+  pinMode(VM_2, OUTPUT);
+
+  // Sets up the arm servo
+  arm.attach(ArmServoID);
+
+  // Start Serial Communcation
+  Serial.begin(SerialBaudRate);
+  while (!Serial) {};
+
+  // Start Controller Communcation
+  ibus.begin(Serial1);
+
+  //init the IMU
+  imuInit();
+  imuZero();
+}
+
+void loop() {
+  imuUpdate();
+
+  int Joy1_X, Joy1_Y, Joy2_X, Joy2_Y;
+
+  int yPwr, xPwr, vertPwr, spinPwr;
+
+  int xyMotorSpeeds[xyMotorAmount], mV;
+
+  // RC controller variablies
+  // 0 is joystick 1 x, 2 is joystick 1 y
+  // 1 is joystick 2 y, 3 is joystick 2 x
+  // 4 is switch a, 5 is switch b
+  // 6 is dial a, 7 is dial b (not currently working (switch 5 affects this value?))
+  // 8 is the 3-step switch c, 9 is switch d
+  for (byte i = 0; i < channelSize; i++) {
+    if (i < 4 | i == 6 | i == 7 | i == 8) {
+      rc_values[i] = readChannel(i, -255, 255, 0);
+    } else {
+      rc_values[i] = readSwitch(i, false);
+    }
+
+    //Debug serial output for controller
+    /*Serial.print("Ch");
+    Serial.print(i + 1);
+    Serial.print(": ");
+    Serial.print(rc_values[i]);
+    Serial.print(" | ");*/
+  }
+
+  yPwr = rc_values[1];
+  xPwr = rc_values[3];
+  spinPwr = rc_values[0];
+  vertPwr = rc_values[2] / 2;
+
+  // converts the joystick 1 to polar coordinates
+  int mag;
+  double angle;
+  angle = atan2(xPwr, yPwr);
+
+  // Convert the joystick from a square to a circle
+  xPwr = (int)(xPwr * cos(angle));
+  yPwr = (int)(yPwr * sin(angle));
+
+  mag = (int)sqrt(((long)yPwr * yPwr) + ((long)xPwr * xPwr));
+
+
+  // only does the larger of spin or x,y movement
+  if (mag >= abs(spinPwr)) {
+    for (int i = 0; i < xyMotorAmount; i++)
+      xyMotorSpeeds[i] = (int)(mag * cos(angle + motorAngle[i]));
+  } else {
+    for (int i = 0; i < xyMotorAmount; i++)
+      xyMotorSpeeds[i] = spinPwr * motorRotCont[i];
+  }
+
+  // Limits the speeds so they can't exceed the max speed of the motors
+  balanceSpeeds(255, xyMotorSpeeds, xyMotorAmount);
+
+  // Set the power in vertical motors
+  setVerticalMotor(1, vertPwr);
+  setVerticalMotor(2, vertPwr);
+
+  // Set the power in x,y motors
+  for (int i = 0; i < xyMotorAmount; i++) {
+    setMotor(i + 1, xyMotorSpeeds[i]);
+  }
+}
