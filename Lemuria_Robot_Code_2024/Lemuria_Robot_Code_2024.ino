@@ -277,9 +277,9 @@ void imuUpdate() {
     myIMU.roll *= RAD_TO_DEG;
 
     //apply offset for zeroing imu
-    myIMU.yaw = myIMU.yaw - atan2(sin(imuYawOffset/RAD_TO_DEG), cos(imuYawOffset/RAD_TO_DEG))*RAD_TO_DEG;
-    myIMU.pitch = myIMU.pitch - atan2(sin(imuPitchOffset/RAD_TO_DEG), cos(imuPitchOffset/RAD_TO_DEG))*RAD_TO_DEG;
-    myIMU.roll = myIMU.roll - atan2(sin(imuRollOffset/RAD_TO_DEG), cos(imuRollOffset/RAD_TO_DEG))*RAD_TO_DEG;
+    myIMU.yaw = myIMU.yaw - atan2(cos(imuYawOffset/RAD_TO_DEG), sin(imuYawOffset/RAD_TO_DEG))*RAD_TO_DEG;
+    myIMU.pitch = myIMU.pitch - atan2(cos(imuPitchOffset/RAD_TO_DEG), sin(imuPitchOffset/RAD_TO_DEG))*RAD_TO_DEG;
+    myIMU.roll = myIMU.roll - atan2(cos(imuRollOffset/RAD_TO_DEG), sin(imuRollOffset/RAD_TO_DEG))*RAD_TO_DEG;
   }  // if (readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01)
 
 
