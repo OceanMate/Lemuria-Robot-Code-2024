@@ -34,7 +34,7 @@ IBusBM ibus;
 
 int SerialBaudRate = 115200;
 // Set to true to get Serial output for debugging
-bool serialDebug = true;
+bool SerialDebug = true;
 
 // Arduino ports x,y motors are connected to (-1 right now to represent temp values)
 // Forward and backwards are digital pins and speeds are anolog pins
