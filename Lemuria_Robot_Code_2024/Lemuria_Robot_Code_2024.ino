@@ -62,9 +62,10 @@ float const robotLength = 62.4, robotWidth = 43.6,
 // (value can be 0 if motor doesn't contribute to turning)
 int motorRotCont[xyMotorAmount];
 
-Servo arm;
+Servo arm, claw;
 // Arduino port for arm servo. Connects to a digital pin
 int ArmServoID = 11;
+int clawServoID = 12;
 
 // RC controller variablies
 // 0 is joystick 1 x, 2 is joystick 1 y
@@ -187,6 +188,12 @@ void imuInit() {
     Serial.flush();
     abort();
   }
+
+  //need to update twice before zeroing because
+  //MAX HAS NO FUCKING CLUE WHY THE FIRST YAW,PTICH,ROLL IMU READS
+  //IS FUCKING WILDLY DIFFENT
+  imuUpdate();
+  imuUpdate();
 }
 
 /*
@@ -277,9 +284,9 @@ void imuUpdate() {
     myIMU.roll *= RAD_TO_DEG;
 
     //apply offset for zeroing imu
-    myIMU.yaw = myIMU.yaw - atan2(cos(imuYawOffset/RAD_TO_DEG), sin(imuYawOffset/RAD_TO_DEG))*RAD_TO_DEG;
-    myIMU.pitch = myIMU.pitch - atan2(cos(imuPitchOffset/RAD_TO_DEG), sin(imuPitchOffset/RAD_TO_DEG))*RAD_TO_DEG;
-    myIMU.roll = myIMU.roll - atan2(cos(imuRollOffset/RAD_TO_DEG), sin(imuRollOffset/RAD_TO_DEG))*RAD_TO_DEG;
+    myIMU.yaw = myIMU.yaw - atan2(sin(imuYawOffset/RAD_TO_DEG), cos(imuYawOffset/RAD_TO_DEG))*RAD_TO_DEG;
+    myIMU.pitch = myIMU.pitch - atan2(sin(imuPitchOffset/RAD_TO_DEG), cos(imuPitchOffset/RAD_TO_DEG))*RAD_TO_DEG;
+    myIMU.roll = myIMU.roll - atan2(sin(imuRollOffset/RAD_TO_DEG), cos(imuRollOffset/RAD_TO_DEG))*RAD_TO_DEG;
   }  // if (readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01)
 
 
@@ -431,6 +438,7 @@ void setup() {
 
   // Sets up the arm servo
   arm.attach(ArmServoID);
+  claw.attach(ClawServoID);
 
   // Start Serial Communcation
   Serial.begin(SerialBaudRate);
@@ -506,6 +514,14 @@ void loop() {
   // Set the power in vertical motors
   setVerticalMotor(1, vertPwr);
   setVerticalMotor(2, vertPwr);
+
+  // mapping dial to servo values 
+  int clawPwr = map(rc_values[5],-255,255,0,180);
+  int armPwr = map(rc_values[6],-255,255,0,180);
+
+  //writing power to servos
+  claw.write(clawPwr);
+  claw.write(armPwr);
 
   // Set the power in x,y motors
   for (int i = 0; i < xyMotorAmount; i++) {
