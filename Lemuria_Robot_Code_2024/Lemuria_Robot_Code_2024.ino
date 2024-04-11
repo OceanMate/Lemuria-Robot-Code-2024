@@ -45,6 +45,9 @@ const int mflForwardID = -1, mflBackwardID = -1, mflSpeedID = -1,
 
 // Arduino ports for vertical motors. Connect to anolog ports(-1 right now to represent temp values)
 const int VM_1 = -1, VM_2 = -1;
+double pitchLockAngle = 0;
+bool pitchLocked = false;
+double pitchKP = 0; 
 
 const int xyMotorAmount = 4;
 
@@ -65,7 +68,7 @@ int motorRotCont[xyMotorAmount];
 Servo arm, claw;
 // Arduino port for arm servo. Connects to a digital pin
 int ArmServoID = 11;
-int clawServoID = 12;
+int ClawServoID = 12;
 
 // RC controller variablies
 // 0 is joystick 1 x, 2 is joystick 1 y
@@ -427,6 +430,15 @@ void setVerticalMotor(int motorNum, int power) {
   analogWrite(pin, power + 127);
 }
 
+//TODO fine tune these values before use
+void lockVerticalMotors() {
+  double disFromTarget = pitchLockAngle - myIMU.pitch;
+  //kp pid control for vertical motors
+  int speed = constrain(disFromTarget*pitchKP,-127,127);
+  setVerticalMotor(1,speed);
+  setVerticalMotor(2,-speed);
+}
+
 void setup() {
   // Calculate motor Rotation Contstant
   for (int i = 0; i < xyMotorAmount; i++)
@@ -511,9 +523,20 @@ void loop() {
   // Limits the speeds so they can't exceed the max speed of the motors
   balanceSpeeds(255, xyMotorSpeeds, xyMotorAmount);
 
+
+
   // Set the power in vertical motors
-  setVerticalMotor(1, vertPwr);
-  setVerticalMotor(2, vertPwr);
+  if(rc_values[5] == 0) {
+    setVerticalMotor(1, vertPwr);
+    setVerticalMotor(2, vertPwr);
+    pitchLocked = false;
+  }else {
+    if(!pitchLocked){
+      pitchLockAngle = myIMU.pitch;
+      pitchLocked = true;
+    }
+
+  }
 
   // mapping dial to servo values 
   int clawPwr = map(rc_values[5],-255,255,0,180);
