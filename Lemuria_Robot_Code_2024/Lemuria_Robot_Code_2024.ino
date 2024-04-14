@@ -26,28 +26,29 @@
 //#define MPU9250_ADDRESS MPU9250_ADDRESS_AD1
 
 MPU9250 myIMU(MPU9250_ADDRESS, I2Cport, I2Cclock);
-float imuYawOffset =0,imuPitchOffset=0,imuRollOffset=0;
+float imuYawOffset = 0, imuPitchOffset = 0, imuRollOffset = 0;
 
 
 // Controller variable
 IBusBM ibus;
 
-int SerialBaudRate = 115200;
+int SerialBaudRate = 9600;
 // Set to true to get Serial output for debugging
 bool SerialDebug = true;
 
 // Arduino ports x,y motors are connected to (-1 right now to represent temp values)
 // Forward and backwards are digital pins and speeds are anolog pins
-const int mflForwardID = -1, mflBackwardID = -1, mflSpeedID = -1,
-          mfrForwardID = -1, mfrBackwardID = -1, mfrSpeedID = -1,
-          mbrForwardID = -1, mbrBackwardID = -1, mbrSpeedID = -1,
-          mblForwardID = -1, mblBackwardID = -1, mblSpeedID = -1;
+const int mflForwardID = 38, mflBackwardID = 36, mflSpeedID = 7,
+          mfrForwardID = 42, mfrBackwardID = 40, mfrSpeedID = 6,
+          mbrForwardID = 43, mbrBackwardID = 41, mbrSpeedID = 4,
+          mblForwardID = 47, mblBackwardID = 45, mblSpeedID = 5;
 
 // Arduino ports for vertical motors. Connect to anolog ports(-1 right now to represent temp values)
-const int VM_1 = -1, VM_2 = -1;
+const int VM_1 = 8, VM_2 = 9;
+Servo fowardVM, backwardVM;
 double pitchLockAngle = 0;
 bool pitchLocked = false;
-double pitchKP = 0; 
+double pitchKP = 0;
 
 const int xyMotorAmount = 4;
 
@@ -65,10 +66,13 @@ float const robotLength = 62.4, robotWidth = 43.6,
 // (value can be 0 if motor doesn't contribute to turning)
 int motorRotCont[xyMotorAmount];
 
+
+
+
 Servo arm, claw;
 // Arduino port for arm servo. Connects to a digital pin
-int ArmServoID = 11;
-int ClawServoID = 12;
+int ArmServoID = 44;
+int ClawServoID = 46;
 
 // RC controller variablies
 // 0 is joystick 1 x, 2 is joystick 1 y
@@ -287,9 +291,9 @@ void imuUpdate() {
     myIMU.roll *= RAD_TO_DEG;
 
     //apply offset for zeroing imu
-    myIMU.yaw = myIMU.yaw - atan2(sin(imuYawOffset/RAD_TO_DEG), cos(imuYawOffset/RAD_TO_DEG))*RAD_TO_DEG;
-    myIMU.pitch = myIMU.pitch - atan2(sin(imuPitchOffset/RAD_TO_DEG), cos(imuPitchOffset/RAD_TO_DEG))*RAD_TO_DEG;
-    myIMU.roll = myIMU.roll - atan2(sin(imuRollOffset/RAD_TO_DEG), cos(imuRollOffset/RAD_TO_DEG))*RAD_TO_DEG;
+    myIMU.yaw = myIMU.yaw - atan2(sin(imuYawOffset / RAD_TO_DEG), cos(imuYawOffset / RAD_TO_DEG)) * RAD_TO_DEG;
+    myIMU.pitch = myIMU.pitch - atan2(sin(imuPitchOffset / RAD_TO_DEG), cos(imuPitchOffset / RAD_TO_DEG)) * RAD_TO_DEG;
+    myIMU.roll = myIMU.roll - atan2(sin(imuRollOffset / RAD_TO_DEG), cos(imuRollOffset / RAD_TO_DEG)) * RAD_TO_DEG;
   }  // if (readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01)
 
 
@@ -386,7 +390,7 @@ void setMotor(int motorNum, int power) {
   analogWrite(motorSpeed, abs(power));
 }
 
-// finds if any value is greater than the limit, then balances out all speeds to be lower than the limit
+// finds if any value is  greater than the limit, then balances out all speeds to be lower than the limit
 void balanceSpeeds(int limit, int motorSpeeds[], int size) {
   double maxValue = 0;
   for (int i = 0; i < size; i++) {
@@ -416,27 +420,32 @@ void findMotorRotCont(int indexValue) {
 // MotorNum should be 1 or 2 Power should be from -127 to 127
 void setVerticalMotor(int motorNum, int power) {
   int pin;
+  power = map(power, -127, 127, 1000, 2000);
   switch (motorNum) {
     case 1:
-      pin = VM_1;
+      fowardVM.writeMicroseconds(power);
+
       break;
     case 2:
-      pin = VM_2;
+      backwardVM.writeMicroseconds(power);
       break;
     default:
       return;
   }
 
-  analogWrite(pin, power + 127);
+
+
+
+  //analogWrite(pin, power);
 }
 
 //TODO fine tune these values before use
 void lockVerticalMotors() {
   double disFromTarget = pitchLockAngle - myIMU.pitch;
   //kp pid control for vertical motors
-  int speed = constrain(disFromTarget*pitchKP,-127,127);
-  setVerticalMotor(1,speed);
-  setVerticalMotor(2,-speed);
+  int speed = constrain(disFromTarget * pitchKP, -127, 127);
+  setVerticalMotor(1, speed);
+  setVerticalMotor(2, -speed);
 }
 
 void setup() {
@@ -452,20 +461,31 @@ void setup() {
   arm.attach(ArmServoID);
   claw.attach(ClawServoID);
 
+  fowardVM.attach(VM_1);
+  backwardVM.attach(VM_2);
+
+  //Initizal veritcal motors at stop position and wait to properly work 
+  fowardVM.writeMicroseconds(1500);
+  backwardVM.writeMicroseconds(1500);
+  delay(1000);
+
+
   // Start Serial Communcation
   Serial.begin(SerialBaudRate);
-  while (!Serial) {};
 
   // Start Controller Communcation
   ibus.begin(Serial1);
 
+  Serial.println("hi");
+
   //init the IMU
-  imuInit();
-  imuZero();
+  //imuInit();
+  //imuZero();
 }
 
 void loop() {
-  imuUpdate();
+  //imuUpdate();
+  //Serial.println("HIIIIIIII");
 
   int Joy1_X, Joy1_Y, Joy2_X, Joy2_Y;
 
@@ -523,31 +543,53 @@ void loop() {
   // Limits the speeds so they can't exceed the max speed of the motors
   balanceSpeeds(255, xyMotorSpeeds, xyMotorAmount);
 
+  /*for (int pos = 1000; pos <= 2000; pos += 10) { // goes from 0 degrees to 180 degrees
+    setVerticalMotor(1, pos);
+    delay(250);                               // waits 25ms for the servo to reach the position
+  }
+  for (int pos = 2000; pos >= 1000; pos -= 10) { // goes from 180 degrees to 0 degrees
+    setVerticalMotor(1,pos);
+    delay(250);                               // waits 25ms for the servo to reach the position
+  }
+  setVerticalMotor(1,1500);
+    delay(1000);
+
+  for (int pos = 1000; pos <= 2000; pos += 10) { // goes from 0 degrees to 180 degrees
+    setVerticalMotor(2, pos);
+    delay(250);                               // waits 25ms for the servo to reach the position
+  }
+  for (int pos = 2000; pos >= 1000; pos -= 10) { // goes from 180 degrees to 0 degrees
+    setVerticalMotor(2,pos);
+    delay(250);                               // waits 25ms for the servo to reach the position
+  }
+    setVerticalMotor(2,1500);
+
+  delay(1000);*/
 
 
   // Set the power in vertical motors
-  if(rc_values[5] == 0) {
+  if (rc_values[5] == 0) {
     setVerticalMotor(1, vertPwr);
     setVerticalMotor(2, vertPwr);
     pitchLocked = false;
-  }else {
-    if(!pitchLocked){
+  } else {
+    if (!pitchLocked) {
       pitchLockAngle = myIMU.pitch;
       pitchLocked = true;
     }
-
   }
 
-  // mapping dial to servo values 
-  int clawPwr = map(rc_values[5],-255,255,0,180);
-  int armPwr = map(rc_values[6],-255,255,0,180);
+  // mapping dial to servo values
+  int clawPwr = map(rc_values[5], -255, 255, 0, 180);
+  int armPwr = map(rc_values[6], -255, 255, 0, 180);
 
   //writing power to servos
   claw.write(clawPwr);
-  claw.write(armPwr);
+  arm.write(armPwr);
 
   // Set the power in x,y motors
   for (int i = 0; i < xyMotorAmount; i++) {
     setMotor(i + 1, xyMotorSpeeds[i]);
+    //setMotor(4, 100);
   }
 }
