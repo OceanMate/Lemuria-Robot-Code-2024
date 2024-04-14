@@ -38,8 +38,8 @@ bool SerialDebug = true;
 
 // Arduino ports x,y motors are connected to (-1 right now to represent temp values)
 // Forward and backwards are digital pins and speeds are anolog pins
-const int mflForwardID = 38, mflBackwardID = 36, mflSpeedID = 7,
-          mfrForwardID = 42, mfrBackwardID = 40, mfrSpeedID = 6,
+const int mflForwardID = 36, mflBackwardID = 38, mflSpeedID = 7,
+          mfrForwardID = 40, mfrBackwardID = 42, mfrSpeedID = 6,
           mbrForwardID = 43, mbrBackwardID = 41, mbrSpeedID = 4,
           mblForwardID = 47, mblBackwardID = 45, mblSpeedID = 5;
 
@@ -497,7 +497,7 @@ void loop() {
   // 0 is joystick 1 x, 2 is joystick 1 y
   // 1 is joystick 2 y, 3 is joystick 2 x
   // 4 is switch a, 5 is switch b
-  // 6 is dial a, 7 is dial b (not currently working (switch 5 affects this value?))
+  // 6 is dial a, 7 is dial b (7 not currently working (switch 5 affects this value?))
   // 8 is the 3-step switch c, 9 is switch d
   for (byte i = 0; i < channelSize; i++) {
     if (i < 4 | i == 6 | i == 7 | i == 8) {
@@ -507,12 +507,13 @@ void loop() {
     }
 
     //Debug serial output for controller
-    /*Serial.print("Ch");
-    Serial.print(i + 1);
+    Serial.print("Ch");
+    Serial.print(i);
     Serial.print(": ");
     Serial.print(rc_values[i]);
-    Serial.print(" | ");*/
+    Serial.print(" | ");
   }
+  Serial.println();
 
   yPwr = rc_values[1];
   xPwr = rc_values[3];
@@ -580,7 +581,12 @@ void loop() {
   }
 
   // mapping dial to servo values
-  int clawPwr = map(rc_values[5], -255, 255, 0, 180);
+  int clawPwr;
+  if(rc_values[4]==1) 
+    clawPwr = 0;
+  else
+    clawPwr = 180;
+  //int clawPwr = map(rc_values[5], -255, 255, 0, 180);
   int armPwr = map(rc_values[6], -255, 255, 0, 180);
 
   //writing power to servos
@@ -589,7 +595,7 @@ void loop() {
 
   // Set the power in x,y motors
   for (int i = 0; i < xyMotorAmount; i++) {
-    setMotor(i + 1, xyMotorSpeeds[i]);
-    //setMotor(4, 100);
+    //setMotor(i + 1, xyMotorSpeeds[i]);
+    setMotor(1, 100);
   }
 }
