@@ -15,6 +15,10 @@
 
 #include <IBusBM.h>
 
+// Imports for temp
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
 //IMU imports
 #include "quaternionFilters.h"
 #include "MPU9250.h"
@@ -27,6 +31,14 @@
 
 MPU9250 myIMU(MPU9250_ADDRESS, I2Cport, I2Cclock);
 float imuYawOffset = 0, imuPitchOffset = 0, imuRollOffset = 0;
+
+
+// Data wire is plugged into port 2 on the Arduino
+#define ONE_WIRE_BUS -1;
+// Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
+OneWire oneWire(ONE_WIRE_BUS);
+// Pass our oneWire reference to Dallas Temperature.
+DallasTemperature sensors(&oneWire);
 
 
 // Controller variable
@@ -478,6 +490,9 @@ void setup() {
 
   Serial.println("hi");
 
+  // Start up the library for temp sensor
+  sensors.begin();
+
   //init the IMU
   //imuInit();
   //imuZero();
@@ -485,7 +500,10 @@ void setup() {
 
 void loop() {
   //imuUpdate();
-  //Serial.println("HIIIIIIII");
+
+  sensors.requestTemperatures(); // Send the command to get temperatures
+  // get temp value in celceious 
+  float tempC = sensors.getTempCByIndex(0);
 
   int Joy1_X, Joy1_Y, Joy2_X, Joy2_Y;
 
@@ -544,29 +562,6 @@ void loop() {
   // Limits the speeds so they can't exceed the max speed of the motors
   balanceSpeeds(255, xyMotorSpeeds, xyMotorAmount);
 
-  /*for (int pos = 1000; pos <= 2000; pos += 10) { // goes from 0 degrees to 180 degrees
-    setVerticalMotor(1, pos);
-    delay(250);                               // waits 25ms for the servo to reach the position
-  }
-  for (int pos = 2000; pos >= 1000; pos -= 10) { // goes from 180 degrees to 0 degrees
-    setVerticalMotor(1,pos);
-    delay(250);                               // waits 25ms for the servo to reach the position
-  }
-  setVerticalMotor(1,1500);
-    delay(1000);
-
-  for (int pos = 1000; pos <= 2000; pos += 10) { // goes from 0 degrees to 180 degrees
-    setVerticalMotor(2, pos);
-    delay(250);                               // waits 25ms for the servo to reach the position
-  }
-  for (int pos = 2000; pos >= 1000; pos -= 10) { // goes from 180 degrees to 0 degrees
-    setVerticalMotor(2,pos);
-    delay(250);                               // waits 25ms for the servo to reach the position
-  }
-    setVerticalMotor(2,1500);
-
-  delay(1000);*/
-
 
   // Set the power in vertical motors
   if (rc_values[5] == 0) {
@@ -595,7 +590,17 @@ void loop() {
 
   // Set the power in x,y motors
   for (int i = 0; i < xyMotorAmount; i++) {
-    //setMotor(i + 1, xyMotorSpeeds[i]);
-    setMotor(1, 100);
+    setMotor(i + 1, xyMotorSpeeds[i]);
+  }
+
+  // Check if reading temp was successful
+  if (tempC != DEVICE_DISCONNECTED_C)
+  {
+    Serial.print("Temperature is: ");
+    Serial.println(tempC);
+  }
+  else
+  {
+    Serial.println("Error: Could not read temperature data");
   }
 }
