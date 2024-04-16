@@ -23,6 +23,12 @@
 #include "quaternionFilters.h"
 #include "MPU9250.h"
 
+//LCD import
+#include <LiquidCrystal_I2C.h>
+
+// Set the LCD address to 0x27 for a 20 chars and 4 line display
+LiquidCrystal_I2C lcd(0x27, 20, 4);
+
 //Set IMU
 #define I2Cclock 400000
 #define I2Cport Wire
@@ -488,10 +494,15 @@ void setup() {
   // Start Controller Communcation
   ibus.begin(Serial1);
 
-  Serial.println("hi");
-
   // Start up the library for temp sensor
   sensors.begin();
+
+  // initialize the LCD
+	lcd.begin();
+
+	// Turn on the blacklight and print a message.
+	lcd.backlight();
+	lcd.print("TURNING ON");
 
   //init the IMU
   //imuInit();
