@@ -457,6 +457,22 @@ void setVerticalMotor(int motorNum, int power) {
   //analogWrite(pin, power);
 }
 
+void updateTemp() {
+  // Check if reading temp was successful
+  if (tempC != DEVICE_DISCONNECTED_C)
+  {
+    lcd.setCursor(0,4);
+    lcd.print("Temperature is: ");
+    lcd.setCursor(15,4);
+    lcd.print(tempC);
+  }
+  else
+  {
+    lcd.setCursor(0,4);
+    Serial.println("Error: Could not read temperature data");
+  }
+}
+
 //TODO fine tune these values before use
 void lockVerticalMotors() {
   double disFromTarget = pitchLockAngle - myIMU.pitch;
@@ -502,7 +518,14 @@ void setup() {
 
 	// Turn on the blacklight and print a message.
 	lcd.backlight();
-	lcd.print("TURNING ON");
+  lcd.setCursor(0,0);
+	lcd.print("They turned the frogs");
+  lcd.setCursor(0,1);
+  lcd.print("Gay");
+  lcd.clear();
+  
+  lcd.setCursor(0,0);
+  lcd.print("FL:     M2:     M3:");
 
   //init the IMU
   //imuInit();
@@ -604,14 +627,5 @@ void loop() {
     setMotor(i + 1, xyMotorSpeeds[i]);
   }
 
-  // Check if reading temp was successful
-  if (tempC != DEVICE_DISCONNECTED_C)
-  {
-    Serial.print("Temperature is: ");
-    Serial.println(tempC);
-  }
-  else
-  {
-    Serial.println("Error: Could not read temperature data");
-  }
+
 }
