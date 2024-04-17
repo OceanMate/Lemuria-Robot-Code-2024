@@ -40,7 +40,7 @@ float imuYawOffset = 0, imuPitchOffset = 0, imuRollOffset = 0;
 
 
 // Data wire is plugged into port 2 on the Arduino
-#define ONE_WIRE_BUS -1;
+#define ONE_WIRE_BUS 2
 // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 OneWire oneWire(ONE_WIRE_BUS);
 // Pass our oneWire reference to Dallas Temperature.
@@ -62,7 +62,7 @@ const int mflForwardID = 36, mflBackwardID = 38, mflSpeedID = 7,
           mblForwardID = 47, mblBackwardID = 45, mblSpeedID = 5;
 
 // Arduino ports for vertical motors. Connect to anolog ports(-1 right now to represent temp values)
-const int VM_1 = 8, VM_2 = 9;
+const int VerticalForwardID = 8, VerticalBackwardID = 9;
 Servo fowardVM, backwardVM;
 double pitchLockAngle = 0;
 bool pitchLocked = false;
@@ -408,6 +408,39 @@ void setMotor(int motorNum, int power) {
   analogWrite(motorSpeed, abs(power));
 }
 
+void motorMessage(int motorNum, int power) {
+  switch (motorNum) {
+    case 1:
+      lcd.setCursor(0, 4);
+      break;
+
+    case 2:
+      lcd.setCursor(0, 9);
+      break;
+
+    case 3:
+      lcd.setCursor(1, 4);
+      break;
+
+    case 4:
+      lcd.setCursor(1, 9);
+      break;
+
+    case 5:
+      lcd.setCursor(2, 4);
+      break;
+
+    case 6:
+      lcd.setCursor(2, 9);
+      break;
+
+    default:
+      return;
+  }
+
+  lcd.print((int)power);
+}
+
 // finds if any value is  greater than the limit, then balances out all speeds to be lower than the limit
 void balanceSpeeds(int limit, int motorSpeeds[], int size) {
   double maxValue = 0;
@@ -458,6 +491,7 @@ void setVerticalMotor(int motorNum, int power) {
 }
 
 void updateTemp() {
+  float tempC = sensors.getTempCByIndex(0);
   // Check if reading temp was successful
   if (tempC != DEVICE_DISCONNECTED_C)
   {
@@ -488,15 +522,15 @@ void setup() {
     findMotorRotCont(i);
 
   // Attaches the vertical motors to an anolog pins
-  pinMode(VM_1, OUTPUT);
-  pinMode(VM_2, OUTPUT);
+  pinMode(VerticalForwardID, OUTPUT);
+  pinMode(VerticalBackwardID, OUTPUT);
 
   // Sets up the arm servo
   arm.attach(ArmServoID);
   claw.attach(ClawServoID);
 
-  fowardVM.attach(VM_1);
-  backwardVM.attach(VM_2);
+  fowardVM.attach(VerticalForwardID);
+  backwardVM.attach(VerticalBackwardID);
 
   //Initizal veritcal motors at stop position and wait to properly work 
   fowardVM.writeMicroseconds(1500);
@@ -525,8 +559,11 @@ void setup() {
   lcd.clear();
   
   lcd.setCursor(0,0);
-  lcd.print("FL:     M2:     M3:");
-
+  lcd.print("FL:     FR:");
+  lcd.setCursor(0,1);
+  lcd.print("BL:     BR:");
+  lcd.setCursor(0, 2);
+  lcd.print("VF:     VB:");
   //init the IMU
   //imuInit();
   //imuZero();
@@ -600,7 +637,9 @@ void loop() {
   // Set the power in vertical motors
   if (rc_values[5] == 0) {
     setVerticalMotor(1, vertPwr);
+    motorMessage(5,vertPwr);
     setVerticalMotor(2, vertPwr);
+    motorMessage(6,vertPwr);
     pitchLocked = false;
   } else {
     if (!pitchLocked) {
@@ -625,6 +664,7 @@ void loop() {
   // Set the power in x,y motors
   for (int i = 0; i < xyMotorAmount; i++) {
     setMotor(i + 1, xyMotorSpeeds[i]);
+    motorMessage(i,xyMotorSpeeds[i]);
   }
 
 
