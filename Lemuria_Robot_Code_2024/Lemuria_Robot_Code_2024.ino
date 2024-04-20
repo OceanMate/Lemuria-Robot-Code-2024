@@ -70,19 +70,10 @@ double pitchKP = 0;
 
 const int xyMotorAmount = 4;
 
-// Various constants used to calculate the Rotation Constant
-float const robotLength = 62.4, robotWidth = 43.6,
-            // Angle of the x,y motors from the center of the robot
-  motorLocAngle[xyMotorAmount] = { atan2(robotWidth / 2, robotLength / 2), atan2(-robotWidth / 2, robotLength / 2),
-                                   atan2(-robotWidth / 2, -robotLength / 2), atan2(robotWidth / 2, -robotLength / 2) },
-            // Angle of the x,y motors. Assumes forward is 0 and counterclockwise is positive
-  // Direction of Forward thrust defines the motor angle
-  motorAngle[xyMotorAmount] = { -M_PI / 4, M_PI / 4, M_PI*(3.0 / 4), -M_PI*(3.0 / 4) };
-
-// A constant of ethier -1 or 1 that is used to detemine wether an
-// x,y motor should go forwards or backwards while turning
-// (value can be 0 if motor doesn't contribute to turning)
-int motorRotCont[xyMotorAmount];
+const int BodyToXYMotorMatrix[4][3] = 
+  {{1, 1, -1, -1},
+   {1, -1, -1, 1},
+   {1, -1, 1, -1}};
 
 
 
