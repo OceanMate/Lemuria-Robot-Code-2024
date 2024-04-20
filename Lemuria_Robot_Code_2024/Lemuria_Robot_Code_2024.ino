@@ -70,10 +70,12 @@ double pitchKP = 0;
 
 const int xyMotorAmount = 4;
 
-const int BodyToXYMotorMatrix[4][3] = 
-  {{1, 1, -1, -1},
-   {1, -1, -1, 1},
-   {1, -1, 1, -1}};
+float bodyToXYMotorMatrix[xyMotorAmount][3] = { { 1, 1, 1 },
+                                                { 1, -1, -1 },
+                                                { -1, -1, 1 },
+                                                { -1, 1, -1 } };
+
+int const MAX = 100;
 
 
 
@@ -90,7 +92,7 @@ int ClawServoID = 10;
 // 6 is dial a, 7 is dial b (not currently working (switch 5 affects this value?))
 // 8 is the 3-step switch c, 9 is switch d
 int const channelSize = 10;
-int rc_values[channelSize];
+float rc_values[channelSize];
 
 //initilize IMU
 void imuInit() {
@@ -211,7 +213,6 @@ void imuInit() {
   imuUpdate();
   imuUpdate();
 }
-
 
 
 /*
@@ -343,10 +344,10 @@ void imuZero() {
 }
 
 // Reads a joystick, dial, or 3 step switch off controller
-int readChannel(byte channelInput, int minLimit, int maxLimit, int defaultValue) {
+int readChannel(byte channelInput, float minLimit, float maxLimit, int defaultValue) {
   uint16_t ch = ibus.readChannel(channelInput);
   if (ch < 100) return defaultValue;
-  return map(ch, 1000, 2000, minLimit, maxLimit);
+  return mapFloat(ch, 1000.0, 2000.0, minLimit, maxLimit);
 }
 
 // Reads a switch from the controller
@@ -450,15 +451,21 @@ void balanceSpeeds(int limit, int motorSpeeds[], int size) {
   }
 }
 
-// Finds the number to multiply the turning speed for each motor
-void findMotorRotCont(int indexValue) {
-  double motorRotationEffectiveness = sin(motorLocAngle[indexValue] - motorAngle[indexValue]);
+void balanceSpeeds(float limit, float motorSpeeds[], int size) {
+  float maxValue = 0;
+  for (int i = 0; i < size; i++) {
+    if (maxValue < abs(motorSpeeds[i]) && abs(motorSpeeds[i]) > limit)
+      maxValue = abs(motorSpeeds[i]);
+  }
 
-  if (motorRotationEffectiveness != 0)
-    // Balances the value to be either -1 or 1
-    motorRotCont[indexValue] = (int)(motorRotationEffectiveness / abs(motorRotationEffectiveness));
-  else motorRotCont[indexValue] = 0;
+  // returns if no value is greater than the limit
+  if (maxValue == 0) return;
+
+  for (int i = 0; i < size; i++) {
+    motorSpeeds[i] = (int)((motorSpeeds[i] / maxValue) * limit);
+  }
 }
+
 
 // Sets the speed for one of the vertical motors.
 // MotorNum should be 1 or 2 Power should be from -127 to 127
@@ -486,16 +493,13 @@ void setVerticalMotor(int motorNum, int power) {
 void updateTemp() {
   float tempC = sensors.getTempCByIndex(0);
   // Check if reading temp was successful
-  if (tempC != DEVICE_DISCONNECTED_C)
-  {
-    lcd.setCursor(0,4);
+  if (tempC != DEVICE_DISCONNECTED_C) {
+    lcd.setCursor(0, 4);
     lcd.print("Temperature is: ");
-    lcd.setCursor(15,4);
+    lcd.setCursor(15, 4);
     lcd.print(tempC);
-  }
-  else
-  {
-    lcd.setCursor(0,4);
+  } else {
+    lcd.setCursor(0, 4);
     Serial.println("Could not read temp");
   }
 }
@@ -513,10 +517,18 @@ float mapFloat(float value, float inMin, float inMax, float outMin, float outMax
   return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
 }
 
+
+void linearTransform(float matrix1[][3], float matrix2[], float result[], int rows1, int cols1) {
+  // Perform a linear transform
+  for (int i = 0; i < rows1; ++i) {
+    result[i] = 0;
+    for (int k = 0; k < cols1; ++k) {
+      result[i] += matrix1[i][k] * matrix2[k];
+    }
+  }
+}
+
 void setup() {
-  // Calculate motor Rotation Contstant
-  for (int i = 0; i < xyMotorAmount; i++)
-    findMotorRotCont(i);
 
   // Attaches the vertical motors to an anolog pins
   pinMode(VerticalForwardID, OUTPUT);
@@ -529,7 +541,7 @@ void setup() {
   fowardVM.attach(VerticalForwardID);
   backwardVM.attach(VerticalBackwardID);
 
-  //Initizal veritcal motors at stop position and wait to properly work 
+  //Initizal veritcal motors at stop position and wait to properly work
   fowardVM.writeMicroseconds(1500);
   backwardVM.writeMicroseconds(1500);
   delay(1000);
@@ -545,19 +557,19 @@ void setup() {
   sensors.begin();
 
   // initialize the LCD
-	lcd.begin();
+  lcd.begin();
 
-	// Turn on the blacklight and print a message.
-	lcd.backlight();
-  lcd.setCursor(0,0);
-	lcd.print("They turned the frogs");
-  lcd.setCursor(0,1);
+  // Turn on the blacklight and print a message.
+  lcd.backlight();
+  lcd.setCursor(0, 0);
+  lcd.print("They turned the frogs");
+  lcd.setCursor(0, 1);
   lcd.print("Gay");
   lcd.clear();
-  
-  lcd.setCursor(0,0);
+
+  lcd.setCursor(0, 0);
   lcd.print("FL:     FR:");
-  lcd.setCursor(0,1);
+  lcd.setCursor(0, 1);
   lcd.print("BL:     BR:");
   lcd.setCursor(0, 2);
   lcd.print("VF:     VB:");
@@ -569,15 +581,15 @@ void setup() {
 void loop() {
   //imuUpdate();
 
-  sensors.requestTemperatures(); // Send the command to get temperatures
-  // get temp value in celceious 
+  sensors.requestTemperatures();  // Send the command to get temperatures
+  // get temp value in celceious
   float tempC = sensors.getTempCByIndex(0);
 
-  int Joy1_X, Joy1_Y, Joy2_X, Joy2_Y;
+  float horizontalVector[3];
+  int vertPwr;
 
-  int yPwr, xPwr, vertPwr, spinPwr;
-
-  int xyMotorSpeeds[xyMotorAmount], mV;
+  float xyMotorSpeeds[xyMotorAmount];
+  int mV;
 
   // RC controller variablies
   // 0 is joystick 1 x, 2 is joystick 1 y
@@ -587,7 +599,7 @@ void loop() {
   // 8 is the 3-step switch c, 9 is switch d
   for (byte i = 0; i < channelSize; i++) {
     if (i < 4 | i == 6 | i == 7 | i == 8) {
-      rc_values[i] = readChannel(i, -255, 255, 0);
+      rc_values[i] = readChannel(i, -1, 1, 0);
     } else {
       rc_values[i] = readSwitch(i, false);
     }
@@ -601,42 +613,23 @@ void loop() {
   }
   Serial.println();
 
-  yPwr = rc_values[1];
-  xPwr = rc_values[3];
-  spinPwr = rc_values[0];
-  vertPwr = rc_values[2] / 2;
+  horizontalVector[0] = rc_values[3];
+  horizontalVector[1] = rc_values[1];
+  horizontalVector[2] = rc_values[0];
+  //vertPwr = rc_values[2] / 2;
 
-  // converts the joystick 1 to polar coordinates
-  int mag;
-  double angle;
-  angle = atan2(xPwr, yPwr);
-
-  // Convert the joystick from a square to a circle
-  xPwr = (int)(xPwr * cos(angle));
-  yPwr = (int)(yPwr * sin(angle));
-
-  mag = (int)sqrt(((long)yPwr * yPwr) + ((long)xPwr * xPwr));
-
-
-  // only does the larger of spin or x,y movement
-  if (mag >= abs(spinPwr)) {
-    for (int i = 0; i < xyMotorAmount; i++)
-      xyMotorSpeeds[i] = (int)(mag * cos(angle + motorAngle[i]));
-  } else {
-    for (int i = 0; i < xyMotorAmount; i++)
-      xyMotorSpeeds[i] = spinPwr * motorRotCont[i];
-  }
+  linearTransform(bodyToXYMotorMatrix, horizontalVector, xyMotorSpeeds, xyMotorAmount, 3);
 
   // Limits the speeds so they can't exceed the max speed of the motors
-  balanceSpeeds(255, xyMotorSpeeds, xyMotorAmount);
+  balanceSpeeds(1.0, xyMotorSpeeds, xyMotorAmount);
 
 
   // Set the power in vertical motors
   if (rc_values[5] == 0) {
     setVerticalMotor(1, vertPwr);
-    motorMessage(5,vertPwr);
+    motorMessage(5, vertPwr);
     setVerticalMotor(2, vertPwr);
-    motorMessage(6,vertPwr);
+    motorMessage(6, vertPwr);
     pitchLocked = false;
   } else {
     if (!pitchLocked) {
@@ -647,7 +640,7 @@ void loop() {
 
   // mapping dial to servo values
   int clawPwr;
-  if(rc_values[4]==1) 
+  if (rc_values[4] == 1)
     clawPwr = 0;
   else
     clawPwr = 180;
@@ -660,9 +653,8 @@ void loop() {
 
   // Set the power in x,y motors
   for (int i = 0; i < xyMotorAmount; i++) {
+    int motorSpeed = (int)mapFloat(xyMotorSpeeds[i], -1, 1, -255, 255);
     setMotor(i + 1, xyMotorSpeeds[i]);
-    motorMessage(i,xyMotorSpeeds[i]);
+    motorMessage(i, xyMotorSpeeds[i]);
   }
-
-
 }
