@@ -212,6 +212,8 @@ void imuInit() {
   imuUpdate();
 }
 
+
+
 /*
 * Update imu values and print values if debug = true
 */
@@ -505,6 +507,10 @@ void lockVerticalMotors() {
   int speed = constrain(disFromTarget * pitchKP, -127, 127);
   setVerticalMotor(1, speed);
   setVerticalMotor(2, -speed);
+}
+
+float mapFloat(float value, float inMin, float inMax, float outMin, float outMax) {
+  return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
 }
 
 void setup() {
