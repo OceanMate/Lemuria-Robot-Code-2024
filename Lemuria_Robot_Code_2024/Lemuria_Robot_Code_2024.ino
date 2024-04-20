@@ -40,7 +40,7 @@ float imuYawOffset = 0, imuPitchOffset = 0, imuRollOffset = 0;
 
 
 // Data wire is plugged into port 2 on the Arduino
-#define ONE_WIRE_BUS 2
+#define ONE_WIRE_BUS 12
 // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 OneWire oneWire(ONE_WIRE_BUS);
 // Pass our oneWire reference to Dallas Temperature.
@@ -56,13 +56,13 @@ bool SerialDebug = true;
 
 // Arduino ports x,y motors are connected to (-1 right now to represent temp values)
 // Forward and backwards are digital pins and speeds are anolog pins
-const int mflForwardID = 36, mflBackwardID = 38, mflSpeedID = 7,
-          mfrForwardID = 40, mfrBackwardID = 42, mfrSpeedID = 6,
-          mbrForwardID = 43, mbrBackwardID = 41, mbrSpeedID = 4,
-          mblForwardID = 47, mblBackwardID = 45, mblSpeedID = 5;
+const int mflForwardID = 28, mflBackwardID = 30, mflSpeedID = 3,
+          mfrForwardID = 32, mfrBackwardID = 34, mfrSpeedID = 4,
+          mbrForwardID = 44, mbrBackwardID = 46, mbrSpeedID = 6,
+          mblForwardID = 40, mblBackwardID = 42, mblSpeedID = 5;
 
 // Arduino ports for vertical motors. Connect to anolog ports(-1 right now to represent temp values)
-const int VerticalForwardID = 8, VerticalBackwardID = 9;
+const int VerticalForwardID = 7, VerticalBackwardID = 8;
 Servo fowardVM, backwardVM;
 double pitchLockAngle = 0;
 bool pitchLocked = false;
@@ -89,8 +89,8 @@ int motorRotCont[xyMotorAmount];
 
 Servo arm, claw;
 // Arduino port for arm servo. Connects to a digital pin
-int ArmServoID = 44;
-int ClawServoID = 46;
+int ArmServoID = 9;
+int ClawServoID = 10;
 
 // RC controller variablies
 // 0 is joystick 1 x, 2 is joystick 1 y
@@ -503,7 +503,7 @@ void updateTemp() {
   else
   {
     lcd.setCursor(0,4);
-    Serial.println("Error: Could not read temperature data");
+    Serial.println("Could not read temp");
   }
 }
 
