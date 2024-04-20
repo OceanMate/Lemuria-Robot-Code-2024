@@ -505,12 +505,19 @@ void updateTemp() {
 }
 
 //TODO fine tune these values before use
-void lockVerticalMotors() {
+void lockVerticalMotors(int vertPwr) {
   double disFromTarget = pitchLockAngle - myIMU.pitch;
   //kp pid control for vertical motors
-  int speed = constrain(disFromTarget * pitchKP, -127, 127);
-  setVerticalMotor(1, speed);
-  setVerticalMotor(2, -speed);
+  int speed = constrain(disFromTarget * pitchKP, -50, 50);
+
+
+  int vertPwrs[2] = {vertPwr+speed,vertPwer-speed};
+  balanceSpeeds(127,vertPwrs,2);
+
+  setVerticalMotor(1, vertPwrs[0]);
+  motorMessage(5,vertPwrs[0]);
+  setVerticalMotor(2, vertPwrs[1]);
+  motorMessage(6,vertPwrs[1]);
 }
 
 float mapFloat(float value, float inMin, float inMax, float outMin, float outMax) {
@@ -636,6 +643,7 @@ void loop() {
       pitchLockAngle = myIMU.pitch;
       pitchLocked = true;
     }
+    lockVerticalMotors(vertPwr);
   }
 
   // mapping dial to servo values
