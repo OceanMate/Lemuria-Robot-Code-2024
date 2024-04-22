@@ -39,8 +39,8 @@ MPU9250 myIMU(MPU9250_ADDRESS, I2Cport, I2Cclock);
 float imuYawOffset = 0, imuPitchOffset = 0, imuRollOffset = 0;
 
 
-// Data wire is plugged into port 2 on the Arduino
-#define ONE_WIRE_BUS 12
+// Data wire is plugged into port 11 on the Arduino
+#define ONE_WIRE_BUS 11
 // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 OneWire oneWire(ONE_WIRE_BUS);
 // Pass our oneWire reference to Dallas Temperature.
