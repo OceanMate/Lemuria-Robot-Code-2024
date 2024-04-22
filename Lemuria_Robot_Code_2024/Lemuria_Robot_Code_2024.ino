@@ -38,13 +38,13 @@ bool SerialDebug = true;
 
 // Arduino ports x,y motors are connected to (-1 right now to represent temp values)
 // Forward and backwards are digital pins and speeds are anolog pins
-const int mflForwardID = 36, mflBackwardID = 38, mflSpeedID = 7,
-          mfrForwardID = 40, mfrBackwardID = 42, mfrSpeedID = 6,
-          mbrForwardID = 43, mbrBackwardID = 41, mbrSpeedID = 4,
-          mblForwardID = 47, mblBackwardID = 45, mblSpeedID = 5;
+const int mflForwardID = 28, mflBackwardID = 30, mflSpeedID = 3,
+          mfrForwardID = 34, mfrBackwardID = 32, mfrSpeedID = 4,
+          mbrForwardID = 46, mbrBackwardID = 44, mbrSpeedID = 6,
+          mblForwardID = 40, mblBackwardID = 42, mblSpeedID = 5;
 
 // Arduino ports for vertical motors. Connect to anolog ports(-1 right now to represent temp values)
-const int VM_1 = 8, VM_2 = 9;
+const int VM_1 = 7, VM_2 = 8;
 Servo fowardVM, backwardVM;
 double pitchLockAngle = 0;
 bool pitchLocked = false;
@@ -71,8 +71,8 @@ int motorRotCont[xyMotorAmount];
 
 Servo arm, claw;
 // Arduino port for arm servo. Connects to a digital pin
-int ArmServoID = 44;
-int ClawServoID = 46;
+int ArmServoID = 10;
+int ClawServoID = 9;
 
 // RC controller variablies
 // 0 is joystick 1 x, 2 is joystick 1 y
