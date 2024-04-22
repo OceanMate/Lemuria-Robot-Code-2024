@@ -511,7 +511,7 @@ void lockVerticalMotors(int vertPwr) {
   int speed = constrain(disFromTarget * pitchKP, -50, 50);
 
 
-  int vertPwrs[2] = {vertPwr+speed,vertPwer-speed};
+  int vertPwrs[2] = {vertPwr+speed,vertPwr-speed};
   balanceSpeeds(127,vertPwrs,2);
 
   setVerticalMotor(1, vertPwrs[0]);
