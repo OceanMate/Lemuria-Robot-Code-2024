@@ -82,8 +82,8 @@ int const MAX = 100;
 
 Servo arm, claw;
 // Arduino port for arm servo. Connects to a digital pin
-int ArmServoID = 9;
-int ClawServoID = 10;
+int ArmServoID = 11;
+int ClawServoID = 9;
 
 // RC controller variablies
 // 0 is joystick 1 x, 2 is joystick 1 y
