@@ -40,7 +40,7 @@ float imuYawOffset = 0, imuPitchOffset = 0, imuRollOffset = 0;
 
 
 // Data wire is plugged into port 11 on the Arduino
-#define ONE_WIRE_BUS 11
+#define ONE_WIRE_BUS 12
 // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 OneWire oneWire(ONE_WIRE_BUS);
 // Pass our oneWire reference to Dallas Temperature.
@@ -623,7 +623,7 @@ void loop() {
   horizontalVector[0] = rc_values[3];
   horizontalVector[1] = rc_values[1];
   horizontalVector[2] = rc_values[0];
-  //vertPwr = rc_values[2] / 2;
+  vertPwr = (int)mapFloat(rc_values[2],-1,1,-127,127);
 
   linearTransform(bodyToXYMotorMatrix, horizontalVector, xyMotorSpeeds, xyMotorAmount, 3);
 
@@ -653,7 +653,7 @@ void loop() {
   else
     clawPwr = 180;
   //int clawPwr = map(rc_values[5], -255, 255, 0, 180);
-  int armPwr = map(rc_values[6], -255, 255, 0, 180);
+  int armPwr = (int)mapFloat(rc_values[6], -1, 1, 0, 180);
 
   //writing power to servos
   claw.write(clawPwr);
