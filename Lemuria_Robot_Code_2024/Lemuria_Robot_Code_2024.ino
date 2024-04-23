@@ -38,7 +38,7 @@ bool SerialDebug = true;
 
 // Arduino ports x,y motors are connected to (-1 right now to represent temp values)
 // Forward and backwards are digital pins and speeds are anolog pins
-const int mflForwardID = 28, mflBackwardID = 30, mflSpeedID = 3,
+const int mflForwardID = 28, mflBackwardID = 30, mflSpeedID = 2,
           mfrForwardID = 34, mfrBackwardID = 32, mfrSpeedID = 4,
           mbrForwardID = 46, mbrBackwardID = 44, mbrSpeedID = 6,
           mblForwardID = 40, mblBackwardID = 42, mblSpeedID = 5;
@@ -71,7 +71,7 @@ int motorRotCont[xyMotorAmount];
 
 Servo arm, claw;
 // Arduino port for arm servo. Connects to a digital pin
-int ArmServoID = 10;
+int ArmServoID = 11;
 int ClawServoID = 9;
 
 // RC controller variablies
@@ -567,7 +567,6 @@ void loop() {
 
   delay(1000);*/
 
-
   // Set the power in vertical motors
   if (rc_values[5] == 0) {
     setVerticalMotor(1, vertPwr);
@@ -590,12 +589,12 @@ void loop() {
   int armPwr = map(rc_values[6], -255, 255, 0, 180);
 
   //writing power to servos
-  claw.write(clawPwr);
+  claw.write( clawPwr);
   arm.write(armPwr);
 
   // Set the power in x,y motors
   for (int i = 0; i < xyMotorAmount; i++) {
     //setMotor(i + 1, xyMotorSpeeds[i]);
-    setMotor(1, 100);
+    setMotor(i+1, 255);
   }
 }
