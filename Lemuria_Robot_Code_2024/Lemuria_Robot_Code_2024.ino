@@ -15,6 +15,12 @@
 
 #include <IBusBM.h>
 
+//LCD import
+#include <LiquidCrystal_I2C.h>
+
+// Set the LCD address to 0x27 for a 20 chars and 4 line display
+LiquidCrystal_I2C lcd(0x27, 20, 4);
+
 //IMU imports
 #include "quaternionFilters.h"
 #include "MPU9250.h"
@@ -477,6 +483,8 @@ void setup() {
   ibus.begin(Serial1);
 
   Serial.println("hi");
+
+  lcd.
 
   //init the IMU
   //imuInit();
