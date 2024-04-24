@@ -44,7 +44,7 @@ bool SerialDebug = true;
 
 // Arduino ports x,y motors are connected to (-1 right now to represent temp values)
 // Forward and backwards are digital pins and speeds are anolog pins
-const int mflForwardID = 28, mflBackwardID = 30, mflSpeedID = 2,
+const int mflForwardID = 28, mflBackwardID = 30, mflSpeedID = 3,
           mfrForwardID = 34, mfrBackwardID = 32, mfrSpeedID = 4,
           mbrForwardID = 46, mbrBackwardID = 44, mbrSpeedID = 6,
           mblForwardID = 40, mblBackwardID = 42, mblSpeedID = 5;
@@ -77,7 +77,7 @@ int motorRotCont[xyMotorAmount];
 
 Servo arm, claw;
 // Arduino port for arm servo. Connects to a digital pin
-int ArmServoID = 11;
+int ArmServoID = 10;
 int ClawServoID = 9;
 
 // RC controller variablies
@@ -484,7 +484,23 @@ void setup() {
 
   Serial.println("hi");
 
-  lcd.
+  /*// initialize the LCD
+  lcd.begin();
+
+  // Turn on the blacklight and print a message.
+  lcd.backlight();
+  lcd.setCursor(0, 0);
+  lcd.print("They turned the frogs");
+  lcd.setCursor(0, 1);
+  lcd.print("Gay");
+  lcd.clear();
+
+  lcd.setCursor(0, 0);
+  lcd.print("FL:     FR:");
+  lcd.setCursor(0, 1);
+  lcd.print("BL:     BR:");
+  lcd.setCursor(0, 2);
+  lcd.print("VF:     VB:");*/
 
   //init the IMU
   //imuInit();
@@ -561,19 +577,13 @@ void loop() {
     delay(250);                               // waits 25ms for the servo to reach the position
   }
   setVerticalMotor(1,1500);
-    delay(1000);
+    delay(1000);*/
 
-  for (int pos = 1000; pos <= 2000; pos += 10) { // goes from 0 degrees to 180 degrees
-    setVerticalMotor(2, pos);
-    delay(250);                               // waits 25ms for the servo to reach the position
+  for (int pos = 0; pos <= 180; pos += 1) { // goes from 0 degrees to 180 degrees
+    claw.write(pos);
+    delay(25);                               // waits 25ms for the servo to reach the position
   }
-  for (int pos = 2000; pos >= 1000; pos -= 10) { // goes from 180 degrees to 0 degrees
-    setVerticalMotor(2,pos);
-    delay(250);                               // waits 25ms for the servo to reach the position
-  }
-    setVerticalMotor(2,1500);
 
-  delay(1000);*/
 
   // Set the power in vertical motors
   if (rc_values[5] == 0) {
@@ -597,12 +607,13 @@ void loop() {
   int armPwr = map(rc_values[6], -255, 255, 0, 180);
 
   //writing power to servos
-  claw.write( clawPwr);
+  //claw.write( clawPwr);
   arm.write(armPwr);
+
 
   // Set the power in x,y motors
   for (int i = 0; i < xyMotorAmount; i++) {
-    //setMotor(i + 1, xyMotorSpeeds[i]);
-    setMotor(i+1, 255);
+    setMotor(i + 1, xyMotorSpeeds[i]);
+    //setMotor(i+1, 255);
   }
 }
