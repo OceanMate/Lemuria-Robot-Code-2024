@@ -27,7 +27,7 @@
 #include <LiquidCrystal_I2C.h>
 
 // Set the LCD address to 0x27 for a 20 chars and 4 line display
-LiquidCrystal_I2C lcd(0x27, 20, 4);
+//LiquidCrystal_I2C lcd(0x27, 20, 4);
 
 //Set IMU
 #define I2Cclock 400000
@@ -67,6 +67,7 @@ Servo fowardVM, backwardVM;
 double pitchLockAngle = 0;
 bool pitchLocked = false;
 double pitchKP = 0;
+int verticalForwardPwr = 0, verticalBackwardPwr = 0;
 
 const int xyMotorAmount = 4;
 
@@ -405,34 +406,34 @@ void setMotor(int motorNum, int power) {
 void motorMessage(int motorNum, int power) {
   switch (motorNum) {
     case 1:
-      lcd.setCursor(0, 4);
+      Serial.print("FL: ");
       break;
 
     case 2:
-      lcd.setCursor(0, 9);
+      Serial.print("FR: ");
       break;
 
     case 3:
-      lcd.setCursor(1, 4);
+      Serial.print("BL: ");
       break;
 
     case 4:
-      lcd.setCursor(1, 9);
+      Serial.print("BR: ");
       break;
 
     case 5:
-      lcd.setCursor(2, 4);
+      Serial.print("VF: ");
       break;
 
     case 6:
-      lcd.setCursor(2, 9);
+      Serial.print("VB: ");
       break;
 
     default:
       return;
   }
 
-  lcd.print((int)power);
+  Serial.println((int)power);
 }
 
 // finds if any value is  greater than the limit, then balances out all speeds to be lower than the limit
@@ -462,7 +463,7 @@ void balanceSpeeds(float limit, float motorSpeeds[], int size) {
   if (maxValue == 0) return;
 
   for (int i = 0; i < size; i++) {
-    motorSpeeds[i] = (int)((motorSpeeds[i] / maxValue) * limit);
+    motorSpeeds[i] = (motorSpeeds[i] / maxValue) * limit;
   }
 }
 
@@ -471,14 +472,23 @@ void balanceSpeeds(float limit, float motorSpeeds[], int size) {
 // MotorNum should be 1 or 2 Power should be from -127 to 127
 void setVerticalMotor(int motorNum, int power) {
   int pin;
-  power = map(power, -127, 127, 1000, 2000);
+  power = map(power, -127, 127, 1250, 1750);
   switch (motorNum) {
     case 1:
+      if(verticalForwardPwr < 0 != power < 0) {
+        fowardVM.writeMicroseconds(1500);
+        delay(2000);
+      }
       fowardVM.writeMicroseconds(power);
-
+      verticalForwardPwr = power;
       break;
     case 2:
+      if(verticalBackwardPwr < 0 != power < 0) {
+        backwardVM.writeMicroseconds(1500);
+        delay(2000);
+      }
       backwardVM.writeMicroseconds(power);
+      verticalBackwardPwr = power;
       break;
     default:
       return;
@@ -490,6 +500,7 @@ void setVerticalMotor(int motorNum, int power) {
   //analogWrite(pin, power);
 }
 
+/*
 void updateTemp() {
   float tempC = sensors.getTempCByIndex(0);
   // Check if reading temp was successful
@@ -502,10 +513,10 @@ void updateTemp() {
     lcd.setCursor(0, 4);
     Serial.println("Could not read temp");
   }
-}
+}*/
 
 //TODO fine tune these values before use
-void lockVerticalMotors(int vertPwr) {
+/*void lockVerticalMotors(int vertPwr) {
   double disFromTarget = pitchLockAngle - myIMU.pitch;
   //kp pid control for vertical motors
   int speed = constrain(disFromTarget * pitchKP, -50, 50);
@@ -518,7 +529,7 @@ void lockVerticalMotors(int vertPwr) {
   motorMessage(5,vertPwrs[0]);
   setVerticalMotor(2, vertPwrs[1]);
   motorMessage(6,vertPwrs[1]);
-}
+}*/
 
 float mapFloat(float value, float inMin, float inMax, float outMin, float outMax) {
   return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
@@ -564,7 +575,7 @@ void setup() {
   sensors.begin();
 
   // initialize the LCD
-  lcd.begin();
+  /*lcd.begin();
 
   // Turn on the blacklight and print a message.
   lcd.backlight();
@@ -579,7 +590,7 @@ void setup() {
   lcd.setCursor(0, 1);
   lcd.print("BL:     BR:");
   lcd.setCursor(0, 2);
-  lcd.print("VF:     VB:");
+  lcd.print("VF:     VB:");*/
   //init the IMU
   //imuInit();
   //imuZero();
@@ -610,6 +621,15 @@ void loop() {
     } else {
       rc_values[i] = readSwitch(i, false);
     }
+    if(i==1)
+      if(abs(rc_values[i]) < .5)
+        rc_values[i] = 0;
+    /*if(i==0)
+      rc_values[i] = 0;
+    if(i==1)
+      rc_values[i] = 1;
+    if(i==3)
+      rc_values[i] = 1;*/
 
     //Debug serial output for controller
     Serial.print("Ch");
@@ -620,6 +640,7 @@ void loop() {
   }
   Serial.println();
 
+
   horizontalVector[0] = rc_values[3];
   horizontalVector[1] = rc_values[1];
   horizontalVector[2] = rc_values[0];
@@ -627,27 +648,33 @@ void loop() {
 
   linearTransform(bodyToXYMotorMatrix, horizontalVector, xyMotorSpeeds, xyMotorAmount, 3);
 
+  
   // Limits the speeds so they can't exceed the max speed of the motors
   balanceSpeeds(1.0, xyMotorSpeeds, xyMotorAmount);
 
+  /*for (int i = 0; i < xyMotorAmount; i++) {
+    int motorSpeed = xyMotorSpeeds[i];
+    //setMotor(i + 1, motorSpeed);
+    motorMessage(i+1, motorSpeed);
+  }*/
 
   // Set the power in vertical motors
-  if (rc_values[5] == 0) {
+  //if (rc_values[5] == 0) {
     setVerticalMotor(1, vertPwr);
-    motorMessage(5, vertPwr);
+    //motorMessage(5, vertPwr);
     setVerticalMotor(2, vertPwr);
-    motorMessage(6, vertPwr);
+    //motorMessage(6, vertPwr);
     pitchLocked = false;
-  } else {
+  /*} else {
     if (!pitchLocked) {
       pitchLockAngle = myIMU.pitch;
       pitchLocked = true;
     }
     lockVerticalMotors(vertPwr);
-  }
+  }*/
 
   // mapping dial to servo values
-  int clawPwr;
+  /*int clawPwr;
   if (rc_values[4] == 1)
     clawPwr = 0;
   else
@@ -657,13 +684,13 @@ void loop() {
 
   //writing power to servos
   claw.write(clawPwr);
-  arm.write(armPwr);
+  arm.write(armPwr);*/
 
   // Set the power in x,y motors
   for (int i = 0; i < xyMotorAmount; i++) {
     int motorSpeed = (int)mapFloat(xyMotorSpeeds[i], -1, 1, -255, 255);
-    setMotor(i + 1, xyMotorSpeeds[i]);
-    motorMessage(i, xyMotorSpeeds[i]);
+    //setMotor(i + 1, motorSpeed);
+    motorMessage(i+1, motorSpeed);
   }
 }
 
